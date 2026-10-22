@@ -184,6 +184,7 @@ static void counter2_frame(void) {
 
 void Host_VerticalBlank(void) {
     s_Frames++;
+    Host_PadVerticalBlank();
     counter2_frame();
     if (s_Frames % FRAMES_PER_LOG == 0) {
         Host_Log("vertical blank %d", s_Frames);

@@ -39,6 +39,14 @@ matching"):
    - **Memory:** the program, its data, the scratchpad and the heap sit at 0x80000000 (decision 2). `main.c` checks
      them at start-up (0x80000000 to 0x801EC76C), then hands the heap to `func_8001144C` as libsn's start-up does: the
      retail heap's 0x18FE08 bytes.
+   - **Data layout:** the game's C reads across its variables' bounds, a word past one being its neighbour, so the
+     link keeps the retail image's order and spacing. The split's data comes first, then each game file's small data
+     in address order (`-fno-zero-initialized-in-bss -fno-toplevel-reorder -fdata-sections`, gathered 4-aligned by
+     `cmake/game_data.ld` as GCC 2.7.2 aligned them), then the bss, kept in .data so nothing of the host's lands
+     between. The host's code is position-independent, so the C library's `stderr` isn't copied among them.
+     `tools/check_layout.py` checks after each link that all 936 of the game's data symbols sit at their retail
+     addresses plus one offset. Before it, a write of the game's past `D_8005F17C`'s start set bit 18 of `stderr`'s
+     copy, and glibc stopped the run.
    - **Libraries:** the 128 PsyQ functions the game and its data name are stubs that return 0 and log their first call
      (`src/psyq/stubs.c`). The BIOS's file calls, named like the C library's, are wrapped at the link
      (`src/psyq/bios_files.c`).
@@ -54,6 +62,9 @@ matching"):
      17.28 calls of `Sys_TimerHandler` a frame.
    - **SPU:** the paging waits on `func_80051328(0)` before and after a sound page's upload, which `src/psyq/libspu.c`
      answers as done.
+   - **Pad:** `src/psyq/pad.c` fills `InitPAD`'s buffers at each vertical blank, as the BIOS does: a digital pad with no
+     button pressed in port 1, none in port 2. Left zeroed, they read as a pad with every button held, and the game
+     stayed on its first screen (level 60).
 5. **The native code (in progress).** `src/native.c` interprets the 32 instructions the GOOL entries' native blocks
    use, on the registers decomp's `gool_native` sets. As on the R3000, a branch runs its delay slot, a load's register
    takes its value one instruction late, and a division by 0 leaves the CPU's results.
@@ -61,8 +72,13 @@ matching"):
      The game goes there through null pointers: `Gool_ResolveRef`'s null operand (0xBE0), which `Gool_OpVector`
      reads. `src/low_ram.c` catches the fault, moves the instruction's address register onto a zeroed 64 KB copy, runs
      that one instruction under the trap flag, and moves the register back. Four sites so far.
-   - **Run:** headless, with no input, the game runs 106,800 vertical blanks in 30 seconds without stopping, through
-     the attract demo's levels and their native code.
+   - **Run:** headless, with no button pressed, the game runs its title and attract demo for 30 seconds, about
+     122,000 vertical blanks. Read every second, `NsfLevel.level` goes 30, 60, 14, 18, 35, 29, 9, then 30, 33, 14,
+     18, 60, 29: the demo's levels and back to the title.
+   - **Argument passing:** the decompilation's C passed two calls' arguments in registers the call didn't name, which
+     the x86 doesn't keep. Fixed there (`PASSED_ON`, decomp/docs/ROADMAP.md section 6, "The macros").
+   - **Debugging:** `CRASH2_SAMPLE` samples where the program spends its time (`src/sampler.c`); a fatal error
+     aborts, its core dump read back by gdb. A live gdb can't follow the game past the low RAM's single steps.
    - **Left:** a differential test of the interpreter against an emulator, on the disc's blocks.
 6. **The picture.** The GTE's register moves on the host, the GPU's packets rasterized into VRAM, the display shown:
    the title screen, compared with the PlayStation build in an emulator.

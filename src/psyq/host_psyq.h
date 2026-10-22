@@ -9,4 +9,7 @@ void Host_OpenDisc(const char *path);
 /* One vertical blank of the game's time: the root counter's interrupts it holds (libetc.c) */
 void Host_VerticalBlank(void);
 
+/* The pad buffers' refresh at a vertical blank (pad.c) */
+void Host_PadVerticalBlank(void);
+
 #endif /* HOST_PSYQ_H */

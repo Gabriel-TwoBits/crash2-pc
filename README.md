@@ -12,8 +12,8 @@ sound, the CD, the memory card and the pad.
 
 ## Status
 
-The game's C boots on the PC, headless: it reads the disc image, pages its levels in and runs their objects, native code
-included, against stubs of most of the PlayStation's libraries. Nothing is shown yet. The plan and its milestones are in
+The game's C boots on the PC, headless: it reads the disc image and runs its title and attract demo, level after
+level, native code included, against stubs of most of the PlayStation's libraries. Nothing is shown or heard yet. The plan and its milestones are in
 [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built

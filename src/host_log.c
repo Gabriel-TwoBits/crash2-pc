@@ -22,5 +22,6 @@ void Host_Fatal(const char *format, ...) {
     vfprintf(stderr, format, arguments);
     fputc('\n', stderr);
     va_end(arguments);
-    exit(EXIT_FAILURE);
+    /* A core dump keeps where it stopped, which gdb reads back (the low RAM's traps keep it from a live run) */
+    abort();
 }

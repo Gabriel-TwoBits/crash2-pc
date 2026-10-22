@@ -118,6 +118,18 @@ static int32_t remainder_of(int32_t dividend, int32_t divisor) {
     }
 }
 
+/* The blocks reach the game's memory only, its RAM or the kernel's (low_ram.c): another address is an interpreter's
+ * error, stopped before it lands */
+#define LOW_RAM_END 0x10000
+
+static void check_address(const Cpu *cpu, uint32_t address) {
+    if (address < LOW_RAM_END || (address >= RAM_WINDOW && address < RAM_WINDOW + RAM_WINDOW_BYTES)) {
+        return;
+    } else {
+        Host_Fatal("native code at 0x%08X reaches 0x%08X, outside the game's memory", cpu->pc, address);
+    }
+}
+
 static void fail(const Cpu *cpu, uint32_t word) {
     Host_Fatal("native code: instruction 0x%08X at 0x%08X is not one the interpreter knows", word, cpu->pc);
 }
@@ -253,17 +265,21 @@ static int step(Cpu *cpu, uint32_t word, uint32_t *next, int *loaded, uint32_t *
         cpu->regs[r] = UNSIGNED_IMMEDIATE(word) << LUI_SHIFT;
         return r;
     case OP_LH:
+        check_address(cpu, address);
         *loaded = r;
         *load_value = (uint32_t)(int32_t)*(int16_t *)(uintptr_t)address;
         return REG_ZERO;
     case OP_LW:
+        check_address(cpu, address);
         *loaded = r;
         *load_value = *(uint32_t *)(uintptr_t)address;
         return REG_ZERO;
     case OP_SH:
+        check_address(cpu, address);
         *(uint16_t *)(uintptr_t)address = (uint16_t)t;
         return REG_ZERO;
     case OP_SW:
+        check_address(cpu, address);
         *(uint32_t *)(uintptr_t)address = t;
         return REG_ZERO;
     default:

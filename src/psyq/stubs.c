@@ -2,7 +2,7 @@
 
 /* The PsyQ functions the game calls, each a stub that returns 0 and logs its first call.
  * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); libcd.c and
- * events.c hold those written so far */
+ * events.c, libcd.c, libspu.c and pad.c hold those written so far */
 #define PSYQ_STUB(name) \
     int name() { \
         static int called; \
@@ -22,13 +22,9 @@ PSYQ_STUB(_card_info)
 PSYQ_STUB(_card_load)
 PSYQ_STUB(_card_read)
 PSYQ_STUB(_card_write)
-PSYQ_STUB(ChangeClearPAD)
 PSYQ_STUB(InitCARD)
-PSYQ_STUB(InitPAD)
 PSYQ_STUB(StartCARD)
-PSYQ_STUB(StartPAD)
 PSYQ_STUB(StopCARD)
-PSYQ_STUB(StopPAD)
 PSYQ_STUB(_new_card)
 PSYQ_STUB(erase)
 PSYQ_STUB(firstfile)
