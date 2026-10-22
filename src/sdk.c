@@ -73,9 +73,8 @@
  * PlayStation the game's code between the two takes milliseconds.
  * TRADEOFF: a millisecond of the CPU's cycles at each key on, where the host's time doesn't pass as the game's C
  * runs */
-#define CPU_HZ 33868800u
 #define MILLISECONDS 1000u
-#define KEY_ON_CYCLES (CPU_HZ / MILLISECONDS)
+#define KEY_ON_CYCLES (SPU_CPU_HZ / MILLISECONDS)
 #define SPU_KEY_ON_LOW 0x1F801D88u
 #define SPU_KEY_ON_HIGH 0x1F801D8Au
 

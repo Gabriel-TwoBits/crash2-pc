@@ -12,6 +12,8 @@ extern "C" {
 #endif
 
 #define SPU_CHANNELS 2
+/* The CPU's clock, whose cycles the SPU's time counts */
+#define SPU_CPU_HZ 33868800u
 
 void Spu_Init(void);
 void Spu_WriteRegister(uint32_t address, uint16_t value);
