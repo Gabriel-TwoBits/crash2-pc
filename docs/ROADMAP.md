@@ -157,8 +157,12 @@ matching"):
      SPU's RAM at once), the interrupt controller, the memory control. What they need, as found: in the game's tick mode
      (`SsSetTickMode(1)`) libsnd ticks from the vertical blank's interrupt callback (`InterruptCallback(0,
      _SsTrapIntrVSync)`, root counter 3 at a target of 1); libspu's transfers end on an `EvSpTRAN` event its DMA
-     callback delivers; and its waits on the SPU's status need the SPU's time to move as they read it (64 cycles a
-     read).
+     callback delivers; its waits on the SPU's status need the SPU's time to move as they read it (64 cycles a read);
+     and a key on needs it to move too: the game keys a sound effect's voice on and, later in the same frame, reads the
+     voices' status (`SpuGetAllKeysStatus`), where an envelope still at 0 reads as the sound ended and the game frees
+     the voice. With the SPU's time held, 213 of 490 sound effects in 8,000 frames ended in the frame they began (the
+     PS1: 32 of 297, all the voices' resets); with a millisecond at each key on, 61, of which 56 are the resets and 5
+     effects shorter than that.
    - **Against the PS1:** `tools/compare_spu.py` on 12,000 vsyncs of the PS1 (intro, title, demos) against 8,000 of the
      port: 1,763 notes aligned, each on the same sample, pitch, volumes and envelope as the PS1's, at the same blank
      within its run of aligned notes. 36 differ, at the 5 points where the game stops a piece or silences every voice:

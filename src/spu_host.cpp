@@ -77,13 +77,19 @@ extern "C" void Spu_WriteRam(uint32_t address, const void* data, uint32_t bytes)
   g_spu.WriteRAM(address, data, bytes);
 }
 
-/* The CPU's cycles Spu_Advance ran ahead of the frames' */
+/* The CPU's cycles Spu_Advance ran ahead of the frames', at most about a frame's (an NTSC frame at 60 a second) */
 static uint32_t s_Advanced;
+static constexpr uint32_t CPU_HZ = 33868800;
+static constexpr uint32_t FRAMES_PER_SECOND = 60;
+static constexpr uint32_t MAX_AHEAD = CPU_HZ / FRAMES_PER_SECOND;
 
 extern "C" void Spu_Advance(uint32_t cycles)
 {
-  g_spu.AddTicks(static_cast<TickCount>(cycles));
-  s_Advanced += cycles;
+  const uint32_t room = MAX_AHEAD - s_Advanced;
+  const uint32_t advanced = cycles < room ? cycles : room;
+
+  g_spu.AddTicks(static_cast<TickCount>(advanced));
+  s_Advanced += advanced;
 }
 
 extern "C" void Spu_Run(uint32_t cycles)

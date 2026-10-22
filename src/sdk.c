@@ -68,6 +68,16 @@
 /* TRADEOFF: the CPU's time as the libraries run, which the SPU's transfers and status take, counted as so many cycles
  * a read of the SPU's registers; their waits on the SPU's status read it in a loop */
 #define SPU_READ_CYCLES 64
+/* The SPU's time a key on takes on: the game keys a voice on and, later in its frame, reads the voices' status
+ * (SpuGetAllKeysStatus), where an envelope still at 0 reads as a sound ended and the game frees the voice. On the
+ * PlayStation the game's code between the two takes milliseconds.
+ * TRADEOFF: a millisecond of the CPU's cycles at each key on, where the host's time doesn't pass as the game's C
+ * runs */
+#define CPU_HZ 33868800u
+#define MILLISECONDS 1000u
+#define KEY_ON_CYCLES (CPU_HZ / MILLISECONDS)
+#define SPU_KEY_ON_LOW 0x1F801D88u
+#define SPU_KEY_ON_HIGH 0x1F801D8Au
 
 static uint32_t s_InterruptStatus;
 static uint32_t s_InterruptMask;
@@ -152,12 +162,23 @@ static uint32_t io_read(uint32_t address, int bytes) {
     }
 }
 
+static void key_on_time(uint32_t address, uint32_t value) {
+    if ((address == SPU_KEY_ON_LOW || address == SPU_KEY_ON_HIGH) && value != 0) {
+        Spu_Advance(KEY_ON_CYCLES);
+    } else {
+        /* Another register, or no voice keyed on */
+    }
+}
+
 static void io_write(uint32_t address, uint32_t value, int bytes) {
     if (address >= SPU_START && address < SPU_END && bytes == HALF_BYTES) {
         Spu_WriteRegister(address, (uint16_t)value);
+        key_on_time(address, value);
     } else if (address >= SPU_START && address < SPU_END && bytes == WORD_BYTES) {
         Spu_WriteRegister(address, (uint16_t)(value & HALF_MASK));
         Spu_WriteRegister(address + HALF_BYTES, (uint16_t)(value >> HALF_BITS));
+        key_on_time(address, value & HALF_MASK);
+        key_on_time(address + HALF_BYTES, value >> HALF_BITS);
     } else if (address == INTERRUPT_STATUS) {
         /* Writing 0s acknowledges */
         s_InterruptStatus &= value;
