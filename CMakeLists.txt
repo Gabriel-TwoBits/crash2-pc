@@ -120,6 +120,7 @@ set(PORT_SOURCES
     src/gpu_raster.cpp
     src/render.c
     src/precise.c
+    src/motion.c
     third_party/swanstation/core/gpu_sw_backend.cpp
     src/spu_host.cpp
     third_party/swanstation/core/spu.cpp

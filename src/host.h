@@ -32,6 +32,14 @@ extern unsigned int g_HostGte[];
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 
+/* An object's step through the collision, what the rounding takes carried into the next at 60 (motion.c) */
+#define OBJECT_MOVE(object, step, zone) Host_MoveObject((object), (step), (zone))
+void Host_MoveObject(void *object, int step, int zone);
+
+/* A game frame each two vertical blanks, or each one (settings.c) */
+#define FRAME_HALF_RATE Host_HalfRate()
+int Host_HalfRate(void);
+
 /* Where a game frame ends: the menus patched (menus.c), the game clock's step (game_clock.c) */
 #define FRAME_ENDING() Host_FrameEnding()
 void Host_FrameEnding(void);

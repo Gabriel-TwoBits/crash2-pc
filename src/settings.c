@@ -24,6 +24,7 @@ static const char *const s_Resolutions[] = {"PS1 RES", "2X RES", "3X RES", "4X R
 static const int s_Scales[] = {1, 2, 3, 4, 6, 8};
 static const char *const s_Steadiness[] = {"JITTERY", "STEADY"};
 static const char *const s_Perspectives[] = {"WARPED", "UNWARPED"};
+static const char *const s_FrameRates[] = {"30 FPS", "60 FPS"};
 
 #define VALUE_COUNT(values) ((int)(sizeof(values) / sizeof((values)[0])))
 
@@ -34,9 +35,14 @@ Setting g_Settings[SETTING_COUNT] = {
     {"resolution", s_Resolutions, VALUE_COUNT(s_Resolutions), 0},
     {"steady", s_Steadiness, VALUE_COUNT(s_Steadiness), 0},
     {"perspective", s_Perspectives, VALUE_COUNT(s_Perspectives), 0},
+    {"fps60", s_FrameRates, VALUE_COUNT(s_FrameRates), 0},
 };
 
 _Static_assert(VALUE_COUNT(s_Scales) == VALUE_COUNT(s_Resolutions), "a scale for each resolution named");
+
+int Host_HalfRate(void) {
+    return g_Settings[SETTING_FRAME_RATE].value == 0;
+}
 
 int Host_ResolutionScale(void) {
     return s_Scales[g_Settings[SETTING_RESOLUTION].value];

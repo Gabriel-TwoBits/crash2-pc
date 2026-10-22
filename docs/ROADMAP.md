@@ -286,7 +286,18 @@ matching"):
     the projection); objects the game culls by its own 4:3 bounds would come in late at the edges, none seen so far.
     The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
     plays the same frames as before. The software picture narrows too.
-13. **The frame rate.** 30 frames a second as the PlayStation runs it, or more. Much of the game measures its time by
-    `g_TimerTicks`, not all: what a game frame of 60 changes (physics, animations, the GOOL scripts) is measured first;
-    failing that, the game's logic at 30 and the picture interpolated between its frames.
+13. **The frame rate (done, 60 as an option).** `Gfx_EndFrame` waits a second vertical blank only for a game frame
+    shorter than 25 ticks, and gives each frame its length in blanks of 17 ticks (17, 34 or 51), by which the game's
+    motion, turning and the GOOL code's velocities scale; the GOOL code's waits count frames of 30 (the ticks over 34).
+    With 60 FPS chosen the second wait is left out (`FRAME_HALF_RATE`, crash2-decomp d266b12), each frame 17 ticks.
+    - **The collision's rounding:** an object's step through the world's collision has its x and z rounded down to a
+      2048-unit grid, which takes 3% of a running Crash's step at 30 and 12% at 60. `src/motion.c` wraps the step
+      (`OBJECT_MOVE`, crash2-decomp 736fefd): what the rounding takes of a frame's step is carried into the next, and
+      what it takes of that one lost, so two frames at 60 move as one at 30.
+    - **Measured** (`CRASH2_GAME_CLOCK_OBJECTS`, the schedules' frames doubled at 60): running, Crash covers 90,112
+      units every 136 ticks at both rates; a jump goes through the same states to the same height; on Turtle Woods
+      run blind for 450 frames of 30 (jumps, spins, crates, fruit) Crash stays within some 20,000 units of the 30
+      run's place (half a frame of 30), the same crates and fruit around him.
+    - **Left:** what the GOOL code counts by its own runs, not by the ticks: the warp room's first scene with Cortex
+      moves its camera on sooner at 60 (the speech, by its sound, keeps its time). Off by default.
 14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.

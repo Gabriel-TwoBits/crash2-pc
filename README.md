@@ -90,12 +90,12 @@ too.
 | L1, R1 | A, S | shoulders |
 | L2, R2 | Q, W | triggers |
 
-The port's options are in the game's menus: OPTIONS on the title screen, and PC OPTIONS in the pause menu's OPTIONS
-(Start, then OPTIONS). Up and down choose a row, ✕, left or right change it, DONE goes back: the window or full
-screen, the picture at 4:3, stretched or wide (16:9, showing more of the world across), sharp or smooth, the
-resolution (the PlayStation's, or 2 to 8 times it, in true colour), the polygons steady (no longer snapped to whole
-pixels, which makes them jitter) and the textures unwarped (in perspective). They are kept in `settings.ini` beside
-the memory card.
+The port's options are in the game's menus: OPTIONS on the title screen, and PC OPTIONS in the pause menu's
+OPTIONS (Start, then OPTIONS). Up and down choose a row, ✕, left or right change it, DONE goes back: the window or
+full screen, the picture at 4:3, stretched or wide (16:9, showing more of the world across), sharp or smooth, the
+resolution (the PlayStation's, or 2 to 8 times it, in true colour), 60 frames a second (the PlayStation's game
+runs at 30), the polygons steady (no longer snapped to whole pixels, which makes them jitter) and the textures
+unwarped (in perspective). They are kept in `settings.ini` beside the memory card.
 
 The resolution takes Vulkan from a 32-bit driver: on Linux the i386 Vulkan packages (`libvulkan1:i386` and
 `mesa-vulkan-drivers:i386` on Debian, what Steam installs too); on Windows the graphics card's driver. Without it the

@@ -11,17 +11,18 @@
 #include "menus.h"
 #include "precise.h"
 #include "render.h"
+#include "settings.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
 
 /* With CRASH2_GAME_CLOCK=DIR, the game clock of decomp's tools/run_game.lua: the root counter's interrupts don't reach
- * the game, and on entering Gfx_EndFrame (FRAME_ENDING) g_TimerTicks becomes the frame's number times 34, every game
- * frame lasting two vertical blanks for the game. Each entry writes a line to DIR/game_frames.txt as run_game.lua
- * does: the game frame displayed, the vertical blank it was shown at, and a 64-bit FNV-1a over the displayed
- * rectangle's 16-bit pixels taken as 32-bit words. CRASH2_GAME_CLOCK_LAST=N ends the run after game frame N;
- * CRASH2_GAME_CLOCK_SHOTS=N,M,... writes those game frames' images as DIR/shot_N.ppm, run_game.lua's shots (and the
- * GPU renderer's at its resolution as DIR/shot_N_gpu.ppm when it draws), and CRASH2_GAME_CLOCK_DUMPS=N,M,... the
- * game's data and bss as DIR/ram_N.bin, a 2 MB image of the RAM at the retail
+ * the game, and on entering Gfx_EndFrame (FRAME_ENDING) g_TimerTicks moves on by 34, every game frame lasting two
+ * vertical blanks for the game (17 and one at 60 frames a second, settings.h). Each entry writes a line to
+ * DIR/game_frames.txt as run_game.lua does: the game frame displayed, the vertical blank it was shown at, and a 64-bit
+ * FNV-1a over the displayed rectangle's 16-bit pixels taken as 32-bit words. CRASH2_GAME_CLOCK_LAST=N ends the run
+ * after game frame N; CRASH2_GAME_CLOCK_SHOTS=N,M,... writes those game frames' images as DIR/shot_N.ppm,
+ * run_game.lua's shots (and the GPU renderer's at its resolution as DIR/shot_N_gpu.ppm when it draws), and
+ * CRASH2_GAME_CLOCK_DUMPS=N,M,... the game's data and bss as DIR/ram_N.bin, a 2 MB image of the RAM at the retail
  * addresses (the rest zero), to compare with run_game.lua's RAM dumps */
 
 #define CLOCK_VARIABLE "CRASH2_GAME_CLOCK"
@@ -30,7 +31,8 @@
 #define SHOTS_MAX 64
 #define DUMPS_VARIABLE "CRASH2_GAME_CLOCK_DUMPS"
 /* CRASH2_GAME_CLOCK_OBJECTS=N,M,...: the game's live objects at those game frames as DIR/objects_N.txt, a line each:
- * its address, its GOOL entry's name, subtype, state, the code word its pc is at, display mode and statuses */
+ * its address, its GOOL entry's name, subtype, state, the code word its pc is at, display mode, statuses,
+ * position and velocity */
 #define OBJECTS_VARIABLE "CRASH2_GAME_CLOCK_OBJECTS"
 /* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
  * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
@@ -51,6 +53,8 @@
 #define CHANNEL_SHIFT 3
 #define DECIMAL 10
 #define GAME_FRAME_TICKS 34
+/* A game frame of one vertical blank, at 60 frames a second (settings.h) */
+#define BLANK_TICKS 17
 #define PATH_BYTES 4096
 #define FNV_OFFSET 0xcbf29ce484222325ULL
 #define FNV_PRIME 0x100000001b3ULL
@@ -61,6 +65,7 @@ extern unsigned int g_TimerTicks;
 static int s_Checked;
 static FILE *s_Frames;
 static int s_GameFrame;
+static unsigned int s_Ticks;
 static int s_LastFrame = -1;
 static const char *s_Directory;
 static int s_Shots[SHOTS_MAX];
@@ -298,10 +303,12 @@ static int list_object(void *object, FILE *file) {
     char name[EID_NAME_BYTES];
 
     Host_EidName(eid, name);
-    fprintf(file, "%08X %s subtype %u state %u pc %d display %u status %08X %08X\n", (unsigned int)(uintptr_t)object,
-            name, field(object, OBJECT_SUBTYPE), field(object, OBJECT_STATE),
+    fprintf(file, "%08X %s subtype %u state %u pc %d display %u status %08X %08X at %d %d %d moving %d %d %d\n",
+            (unsigned int)(uintptr_t)object, name, field(object, OBJECT_SUBTYPE), field(object, OBJECT_STATE),
             (int)(field(object, OBJECT_PC) - code) / WORD_BYTES, field(object, OBJECT_DISPLAY_MODE),
-            field(object, OBJECT_STATUS_A), field(object, OBJECT_STATUS_B));
+            field(object, OBJECT_STATUS_A), field(object, OBJECT_STATUS_B), (int)field(object, OBJECT_X),
+            (int)field(object, OBJECT_Y), (int)field(object, OBJECT_Z), (int)field(object, OBJECT_VELOCITY_X),
+            (int)field(object, OBJECT_VELOCITY_Y), (int)field(object, OBJECT_VELOCITY_Z));
     return 0;
 }
 
@@ -347,7 +354,8 @@ void Host_FrameEnding(void) {
         /* Not a listed frame */
     }
     s_GameFrame++;
-    g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);
+    s_Ticks += Host_HalfRate() ? GAME_FRAME_TICKS : BLANK_TICKS;
+    g_TimerTicks = s_Ticks;
     /* As run_game.lua's: the presses apply to the game frame after the one ending */
     s_Held = held_in(s_GameFrame + 1);
     if (s_LastFrame >= 0 && s_GameFrame > s_LastFrame) {
