@@ -19,7 +19,8 @@
 #define NODES_AROUND 12
 /* The camera paths that look at the world side-on, whose nodes ahead and behind lie across the view (path kinds 3 and
  * 8, by Crash2Recomp's notes: decomp's config/symbol_addrs.txt). Along a path into the view they lie ahead of the
- * camera and behind it, and behind it the game's renderer draws them wrong: those keep the camera's list */
+ * camera and behind it and add nothing seen (Turtle Woods' pictures the same to the byte): those keep the camera's
+ * list */
 #define PATH_SIDE_ON 3
 #define PATH_SIDE_ON_TOO 8
 /* The sort lists: a count, a word unused, then the entries (decomp's 80039D2C.c, SORT_LIST_ENTRIES) */
@@ -125,26 +126,26 @@ void Host_FramePrimitivesFree(int32_t buffer) {
     Heap_Free(buffer);
 }
 
-/* The list at a node near the camera's: the camera's decoded steps nodes along, or as far as the path goes */
+/* The list at a node near the camera's: the camera's decoded steps nodes along, or as far as the path goes. The
+ * decoding goes from a copy: backward, it undoes the delta's swaps on the list it starts from, which would leave the
+ * game's own list scrambled for its next decoding */
 static const uint16_t *list_at(const uint16_t *camera, uint16_t *const *items, int steps, int direction,
                                uint16_t (*buffers)[SORT_LIST_HALVES]) {
-    const uint16_t *from = camera;
     int current = 0;
     int step;
 
+    memcpy(buffers[current], camera, sizeof(camera[0]) * (size_t)(SORT_LIST_FIRST + (int16_t)camera[0]));
     for (step = 0; step < steps; step++) {
         int node = g_CameraNode + (direction == FORWARD ? step + 1 : -step);
-        uint16_t *to = buffers[current];
 
         if (node < 1 || node >= g_CameraNodeCount) {
             break;
         } else {
-            func_80029800(items[node], (int32_t)(uintptr_t)from, to, direction);
-            from = to;
+            func_80029800(items[node], (int32_t)(uintptr_t)buffers[current], buffers[!current], direction);
             current = !current;
         }
     }
-    return from;
+    return buffers[current];
 }
 
 /* Another list's entries the camera's lacks, each after the camera's entry it follows there (or before them all) */

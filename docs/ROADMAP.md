@@ -294,13 +294,19 @@ matching"):
       adds the polygons of the lists 12 nodes ahead and behind (decoded from the camera's by the game's decoder), each
       after the one it follows in its own list, of the worlds the camera's list draws from (another may not be loaded),
       through `WORLD_SORT_LIST` (crash2-decomp a3ccf38). Only on the side-on paths, kinds 3 and 8 by Crash2Recomp's
-      notes: along a path into the view the nodes behind lie behind the camera, whose polygons the renderer drew as
-      shards. More polygons take more primitives (the frame buffers' 89 KB already 76 used on Turtle Woods): with
-      16:9 chosen when a level opens, its frame buffers are the host's, 256 KB (`FRAME_PRIMITIVES_ALLOC`). The objects
-      still come and go by the game's draw lists. The SLST entry is read only when its page is in memory, as
-      `Nsf_OpenEntry` finds it without opening it: opened each frame, with its wait, it could page in from the disc
-      while the frame was drawn. No side-on path reached by the schedules yet: the lists' merging was run on Turtle
-      Woods' paths (5,900 game frames) before it was kept to the side-on ones.
+      notes: along a path into the view the lists ahead and behind add nothing seen (Turtle Woods' pictures the same
+      to the byte). The lists are decoded from a copy of the camera's: the game's backward decoding undoes a delta's
+      swaps on the list it starts from, and decoding from the game's own list scrambled it, so the game's next
+      decoding went wrong (garbage polygons, then its memory and the textures overwritten; the shards once taken for
+      polygons behind the camera). More polygons take more primitives (the frame buffers' 89 KB already 76 used on
+      Turtle Woods): with 16:9 chosen when a level opens, its frame buffers are the host's, 256 KB
+      (`FRAME_PRIMITIVES_ALLOC`). The objects still come and go by the game's draw lists. The SLST entry is read only
+      when its page is in memory, as `Nsf_OpenEntry` finds it without opening it: opened each frame, with its wait,
+      it could page in from the disc while the frame was drawn. No side-on path reached by the schedules yet: the
+      lists' merging was run on Turtle Woods' paths (5,900 game frames), the game's list checked unchanged by it.
+    - **Still missing at the edges:** in the warp room the right edge's world is absent at 16:9 though the camera's
+      path (kind 4) is not side-on: its lists 12 nodes around add 2 to 4 polygons, and the absent ones reach neither
+      renderer. Open.
 13. **The frame rate (done, 60 as an option).** The game's logic stays at its 30 frames a second, as on the
     PlayStation, and a frame of the picture alone is drawn between two of its (`src/between.c`, decomp's
     `FRAME_BETWEEN`, `FRAME_BETWEEN_SHOWN` and `FRAME_ENDED`, crash2-decomp d7053e9): at a game frame's end the camera
