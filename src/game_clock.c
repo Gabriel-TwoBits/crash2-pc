@@ -29,7 +29,10 @@
 #define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
 #define PRESSES_MAX 256
 #define LINE_BYTES 256
+#define PRESS_COMMAND "press "
+/* A button's name, at most BUTTON_NAME_BYTES with its end, and the scan of a press line's fields after the command */
 #define BUTTON_NAME_BYTES 16
+#define PRESS_FORMAT "%d %d %15s"
 #define PRESS_FIELDS 3
 /* The PlayStation's 2 MB, which holds the retail image's data and bss (retail.h) */
 #define RAM_BYTES 0x200000
@@ -102,9 +105,9 @@ static void read_presses(const char *path) {
             char name[BUTTON_NAME_BYTES];
             Press press;
 
-            if (strncmp(line, "press ", strlen("press ")) != 0) {
+            if (strncmp(line, PRESS_COMMAND, strlen(PRESS_COMMAND)) != 0) {
                 continue;
-            } else if (sscanf(line + strlen("press "), "%d %d %15s", &press.first, &press.last, name) !=
+            } else if (sscanf(line + strlen(PRESS_COMMAND), PRESS_FORMAT, &press.first, &press.last, name) !=
                        PRESS_FIELDS || s_PressCount >= PRESSES_MAX) {
                 Host_Fatal("%s: a press line it can't take: %s", PRESSES_VARIABLE, line);
             } else {
