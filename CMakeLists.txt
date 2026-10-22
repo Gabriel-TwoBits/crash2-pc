@@ -9,6 +9,14 @@ endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
+# Optimized, with its debugging symbols, unless a build type is asked for: left unset, SDL3's build makes it Debug,
+# which runs the game at half the speed
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "The build's type" FORCE)
+else()
+    message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+endif()
+
 # SDL3 from its release, pinned, built for the 32-bit program: Debian's i386 package conflicts with backports' Mesa. A
 # shared library beside the program, out of the game's 8 MB at 0x80000000 (src/host.h); it loads the windowing and
 # audio libraries (X11, Wayland, PulseAudio, ALSA) at run time
@@ -62,9 +70,10 @@ target_include_directories(game PRIVATE ${DECOMP}/include)
 target_compile_definitions(game PRIVATE NON_MATCHING GTE_MODEL main=Game_Main)
 # The PlayStation's GCC 2.7.2 assumed no strict aliasing, wrapping arithmetic and common symbols; the decompilation's
 # warnings are its own (-w). Each file's data stays in .data in its order, as the retail image's small data
-# (tools/check_layout.py)
+# (tools/check_layout.py). Unoptimized whatever the build's type: at -O2 the game's C plays otherwise (the demo's run
+# parts from the debug build's and stops on a polyline of over 256 vertices)
 target_compile_options(game PRIVATE
-    -std=gnu89 -w -fno-pie -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
+    -O0 -std=gnu89 -w -fno-pie -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
     -fno-zero-initialized-in-bss -fno-toplevel-reorder -fdata-sections
     -include ${CMAKE_SOURCE_DIR}/src/host.h "-Wa,-I${HOST_ASM}")
 

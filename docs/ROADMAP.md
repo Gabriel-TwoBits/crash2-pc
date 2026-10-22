@@ -139,7 +139,17 @@ matching"):
      where the PS1's RAM holds it, and sends it; the heap sits at the retail heap's place modulo 64 KB and the
      scratchpad at a 1 KB boundary, so the game's alignments of their addresses come out the same (`Gfx_OpenVideo`'s
      buffer padding, 4 bytes apart before).
-   - **Left:** the CD's timing, for whole runs to stay together; speed.
+   - **Speed (done):** the build was unoptimized: SDL3's CMake leaves an unset build type at Debug. It now defaults to
+     RelWithDebInfo (-O2, with symbols), the game's C kept at -O0: at -O2 it plays otherwise, the demo parting from the
+     debug build's and stopping on a polyline of over 256 vertices, undefined behaviour somewhere in it still to find.
+     Headless, the demo's 6,000 game frames went from 144 vertical blanks a second to 547, its game frames' hashes, SPU
+     writes and the memory-card run's card the same to the byte as the debug build's, the native code agreeing with
+     Unicorn.
+   - **Left:** the CD's timing, for whole runs to stay together with the PS1's. A drive model alone won't do it: the PS1
+     gives an unpaced game frame 1 to 6 vsyncs by its CPU's load, which the port doesn't model, so a read ends at
+     another game frame whatever its length. It takes a paced run on both sides (run_game's pace, each game frame a set
+     number of vsyncs, and the same pace on the port's clock) and the drive's timing as PCSX-Redux models it; a check
+     for the tools, not for play, where a read ending at once only loads sooner. And the game's C at -O2.
 7. **Input, sound, saves (done).**
    - **Input (done):** `src/input.c` reads the keyboard and the first gamepad through SDL3, and `src/psyq/pad.c`
      writes them into the pad's buffer at each vertical blank: a digital pad's buttons, 0 while pressed, in psx-spx's

@@ -623,8 +623,8 @@ void Mips_Run(MipsCpu *cpu, long max_steps) {
         MipsHook hook = in_image(cpu->pc) ? hook_at(cpu->pc) : NULL;
         uint32_t word;
         uint32_t next = cpu->next + INSTRUCTION_BYTES;
-        int loaded;
-        uint32_t load_value;
+        int loaded = MIPS_REG_ZERO;
+        uint32_t load_value = 0;
         int written = MIPS_REG_ZERO;
 
         if (s_Pending != NULL) {
