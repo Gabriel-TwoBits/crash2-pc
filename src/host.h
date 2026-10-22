@@ -41,7 +41,9 @@ void Host_FrameEnding(void);
 struct GoolObject;
 void Host_RunNative(struct GoolObject *object, int *state_pool, int **pc, int **sp, unsigned char *frame);
 
-/* The GTE model's projections before their rounding (precise.c) */
+/* The GTE model's projections: narrowed across for the wide view, and kept before their rounding (precise.c) */
+#define GTE_HORIZONTAL(offset) Host_Horizontal(offset)
+long long Host_Horizontal(long long offset);
 #define GTE_PROJECTED(sxy, view, h, ofx, ofy) Host_GteProjected((sxy), (const long long *)(view), (h), (ofx), (ofy))
 void Host_GteProjected(unsigned int sxy, const long long *view, unsigned int h, int ofx, int ofy);
 

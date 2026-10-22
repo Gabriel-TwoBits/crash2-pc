@@ -47,6 +47,8 @@
 /* The 4:3 picture */
 #define ASPECT_WIDTH 4
 #define ASPECT_HEIGHT 3
+#define WIDE_ASPECT_WIDTH 16
+#define WIDE_ASPECT_HEIGHT 9
 #define HALF 0.5f
 
 /* The command's bits (gpu.c's) and E1's: the page's fields, the blending mode, the rectangles' flips */
@@ -1039,22 +1041,25 @@ static void upload_picture(SDL_GPUCommandBuffer *command, int width, int height,
     SDL_EndGPUCopyPass(copy);
 }
 
-/* The window's viewport for the picture: 4:3 in the middle, or all of it stretched */
+/* The window's viewport for the picture: 4:3 (or 16:9 for the wide view) in the middle, or all of it stretched */
 static SDL_GPUViewport viewport(Uint32 width, Uint32 height) {
     SDL_GPUViewport result;
+    int wide = g_Settings[SETTING_SHAPE].value == SHAPE_WIDE;
+    Uint32 aspect_width = wide ? WIDE_ASPECT_WIDTH : ASPECT_WIDTH;
+    Uint32 aspect_height = wide ? WIDE_ASPECT_HEIGHT : ASPECT_HEIGHT;
 
     SDL_zero(result);
     result.max_depth = 1.0f;
-    if (g_Settings[SETTING_STRETCH].value) {
+    if (g_Settings[SETTING_SHAPE].value == SHAPE_STRETCHED) {
         result.w = (float)width;
         result.h = (float)height;
-    } else if (width * ASPECT_HEIGHT > height * ASPECT_WIDTH) {
+    } else if (width * aspect_height > height * aspect_width) {
         result.h = (float)height;
-        result.w = (float)height * ASPECT_WIDTH / ASPECT_HEIGHT;
+        result.w = (float)height * aspect_width / aspect_height;
         result.x = ((float)width - result.w) * HALF;
     } else {
         result.w = (float)width;
-        result.h = (float)width * ASPECT_HEIGHT / ASPECT_WIDTH;
+        result.h = (float)width * aspect_height / aspect_width;
         result.y = ((float)height - result.h) * HALF;
     }
     return result;

@@ -18,7 +18,7 @@
 
 /* Each value names the setting, as the pause menu's MONO and STEREO do: its rows hold some 12 characters */
 static const char *const s_Displays[] = {"WINDOW", "FULLSCREEN"};
-static const char *const s_Shapes[] = {"4:3", "STRETCHED"};
+static const char *const s_Shapes[] = {"4:3", "STRETCHED", "16:9"};
 static const char *const s_Smoothing[] = {"SHARP", "SMOOTH"};
 static const char *const s_Resolutions[] = {"PS1 RES", "2X RES", "3X RES", "4X RES", "6X RES", "8X RES"};
 static const int s_Scales[] = {1, 2, 3, 4, 6, 8};
@@ -29,7 +29,7 @@ static const char *const s_Perspectives[] = {"WARPED", "UNWARPED"};
 
 Setting g_Settings[SETTING_COUNT] = {
     {"fullscreen", s_Displays, VALUE_COUNT(s_Displays), 0},
-    {"stretch", s_Shapes, VALUE_COUNT(s_Shapes), 0},
+    {"shape", s_Shapes, VALUE_COUNT(s_Shapes), 0},
     {"smooth", s_Smoothing, VALUE_COUNT(s_Smoothing), 0},
     {"resolution", s_Resolutions, VALUE_COUNT(s_Resolutions), 0},
     {"steady", s_Steadiness, VALUE_COUNT(s_Steadiness), 0},

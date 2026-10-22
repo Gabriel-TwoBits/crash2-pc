@@ -5,7 +5,7 @@
 
 enum {
     SETTING_FULLSCREEN,
-    SETTING_STRETCH,
+    SETTING_SHAPE,
     SETTING_SMOOTH,
     SETTING_RESOLUTION,
     SETTING_STEADY,
@@ -20,6 +20,13 @@ typedef struct {
     int count;
     int value;
 } Setting;
+
+/* The picture's shapes: the PlayStation's 4:3, that stretched to the window, and a wider view at 16:9 */
+enum {
+    SHAPE_4_3,
+    SHAPE_STRETCHED,
+    SHAPE_WIDE
+};
 
 extern Setting g_Settings[SETTING_COUNT];
 

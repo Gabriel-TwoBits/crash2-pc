@@ -31,6 +31,8 @@
 /* The picture's 4:3, as a 640 by 480 canvas the window letterboxes */
 #define LOGICAL_WIDTH 640
 #define LOGICAL_HEIGHT 480
+/* The wide view's 16:9 */
+#define WIDE_LOGICAL_HEIGHT 360
 #define MAX_DISPLAY_WIDTH 640
 #define MAX_DISPLAY_HEIGHT 512
 #define PIXELS_MAX (VRAM_WIDTH * VRAM_HEIGHT)
@@ -119,12 +121,16 @@ void Host_ApplySettings(void) {
     if (s_Renderer == NULL) {
         /* The GPU renderer's window, which it presents to as the settings have it */
         return;
-    } else if (g_Settings[SETTING_STRETCH].value) {
+    } else if (g_Settings[SETTING_SHAPE].value == SHAPE_STRETCHED) {
         shape = SDL_LOGICAL_PRESENTATION_STRETCH;
     } else {
-        /* 4:3, letterboxed */
+        /* 4:3 or 16:9, letterboxed */
     }
-    SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, shape);
+    if (g_Settings[SETTING_SHAPE].value == SHAPE_WIDE) {
+        SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, WIDE_LOGICAL_HEIGHT, shape);
+    } else {
+        SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, shape);
+    }
     if (s_Texture != NULL) {
         SDL_SetTextureScaleMode(s_Texture, scale_mode());
     } else {

@@ -278,8 +278,14 @@ matching"):
     99.8% of the polygons drawn have all theirs. TRADEOFF: two vertices projected to the same pixel in a frame share
     the later's; following each value through the game's memory (PGXP) would tell them apart. Both are options, off
     as the PlayStation draws, shown with the GPU renderer.
-12. **Widescreen.** A wider field of view through the GTE's projection, the game's culling of what falls outside a 4:3
-    screen measured and widened where objects would vanish at the edges.
+12. **Widescreen (done).** The shape's third value, 16:9: decomp's GTE model lets a host narrow each projection's
+    horizontal offset from the screen's centre (`GTE_HORIZONTAL`, crash2-decomp f7eb8a3), which the port does by 3/4,
+    and the picture is shown at 16:9, so a 4:3 picture's worth of the world takes three quarters of the width and the
+    rest shows what lay beside it. The HUD and the menus, projected too, keep their shape at the middle. The world's
+    geometry is there at the edges on the attract demo's levels (the game culls it on the screen's coordinates, after
+    the projection); objects the game culls by its own 4:3 bounds would come in late at the edges, none seen so far.
+    The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
+    plays the same frames as before. The software picture narrows too.
 13. **The frame rate.** 30 frames a second as the PlayStation runs it, or more. Much of the game measures its time by
     `g_TimerTicks`, not all: what a game frame of 60 changes (physics, animations, the GOOL scripts) is measured first;
     failing that, the game's logic at 30 and the picture interpolated between its frames.
