@@ -239,6 +239,9 @@ static void on_step(Cpu *cpu) {
 }
 
 #ifdef _WIN32
+/* AddVectoredExceptionHandler's order: first of the handlers */
+#define HANDLER_CALLED_FIRST 1
+
 /* A fault outside low RAM, or a step not this handler's, goes on to the system's handlers */
 static LONG CALLBACK on_exception(EXCEPTION_POINTERS *pointers) {
     const EXCEPTION_RECORD *record = pointers->ExceptionRecord;
@@ -261,7 +264,7 @@ static LONG CALLBACK on_exception(EXCEPTION_POINTERS *pointers) {
 }
 
 void Host_InstallLowRam(void) {
-    if (AddVectoredExceptionHandler(1, on_exception) == NULL) {
+    if (AddVectoredExceptionHandler(HANDLER_CALLED_FIRST, on_exception) == NULL) {
         Host_Fatal("can't install the low RAM's exception handler");
     } else {
         /* Installed first in the handlers' chain */

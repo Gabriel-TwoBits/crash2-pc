@@ -10,11 +10,13 @@
 #define GAME_LIBRARY "crash2-game.dll"
 #define GAME_ENTRY "Host_Main"
 #define LAUNCH_FAILURE 1
+/* The message: its words and a path's */
+#define MESSAGE_BYTES (2 * MAX_PATH)
 
 typedef int (*Entry)(int argc, char **argv);
 
 static int fail(const char *what) {
-    char message[MAX_PATH * 2];
+    char message[MESSAGE_BYTES];
 
     snprintf(message, sizeof(message), "%s (error %lu). The game needs 64-bit Windows, %s beside crash2.exe, and "
              "nothing else loaded at 0x80000000.", what, (unsigned long)GetLastError(), GAME_LIBRARY);
