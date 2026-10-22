@@ -13,8 +13,11 @@
  * The game calls 4 of its functions by addresses the split leaves unnamed: SsSepStop (0x80056304), SsSepSetVol
  * (0x80056760), SsSepSetCrescendo (0x800528C4) and SsSepSetDecrescendo (0x80052B4C), by their arguments and uses in
  * decomp's src/game/800324A8.c.
- * TRADEOFF: libsnd's own formulas (a note's volume, pan and pitch, voice allocation, vibrato and portamento) aren't
- * documented: these are MIDI's usual ones, and the tones' vibrato and portamento are left out */
+ * libsnd's formulas for a note's volume, pan and pitch aren't documented: these are measured, from the SPU registers
+ * the PS1's libsnd writes for the title's music in PCSX-Redux.
+ * TRADEOFF: that music keeps the programs', channels' and sequence's volumes and pans at their full or centre, so how
+ * they enter is MIDI's usual way, unmeasured; so are the pitch bend's range and the voice allocation, and the tones'
+ * vibrato and portamento are left out */
 
 #define VAB_MAX 16
 #define SEP_MAX 4
@@ -88,6 +91,8 @@
 #define SEVEN_BITS 0x7F
 #define BYTE_BITS 8
 #define CENTER_PAN 64
+/* A pan of 63 or more is a side's full volume */
+#define PAN_UNIT 63.0
 #define MIDI_MAX 127
 #define BEND_CENTER 0x2000
 #define BEND_SHIFT 7
@@ -109,7 +114,8 @@
 #define PITCH_ONE 0x1000
 #define PITCH_MAX 0x3FFF
 #define SEMITONES 12.0
-#define FINE_STEPS 128.0
+#define FINE_SHIFT 3
+#define FINE_STEPS 16.0
 /* SsSetMVol's 127 is the SPU's 0x3FFF */
 #define MASTER_SCALE 129
 
@@ -458,8 +464,13 @@ static int clamp(int value, int low, int high) {
     }
 }
 
-/* A voice's volumes: the note's velocity, its channel's volume and expression, its tone's, program's and VAB's, its
- * sequence's, each of 127; panned by the tone's, program's and channel's pans around the centre */
+static double squared(double value) {
+    return value * value;
+}
+
+/* A voice's volumes: the square of the product of the note's velocity, its tone's, program's, VAB's, channel's and
+ * sequence's volumes, each of 127, and of a side's pan, the pan over 63 up to 1 (right) or its complement (left).
+ * The PS1's own volumes for the title's music (velocities, tones' volumes and pans) come out within 2 of these */
 static void voice_volume(int voice) {
     const Voice *v = &s_Voices[voice];
     const Sequence *seq = &s_Seps[v->sep].sequences[v->seq];
@@ -467,29 +478,25 @@ static void voice_volume(int voice) {
     const uint8_t *vab = s_Vabs[s_Seps[v->sep].vab].header;
     double level = (double)v->velocity / MIDI_MAX * channel->volume / MIDI_MAX * channel->expression / MIDI_MAX *
                    v->tone[TONE_VOLUME] / MIDI_MAX * v->program[PROGRAM_VOLUME] / MIDI_MAX *
-                   vab[VAB_MASTER_VOLUME_OFFSET] / MIDI_MAX * VOLUME_MAX;
+                   vab[VAB_MASTER_VOLUME_OFFSET] / MIDI_MAX;
     int pan = clamp(v->tone[TONE_PAN] + v->program[PROGRAM_PAN] + channel->pan - CENTER_PAN - CENTER_PAN, 0, MIDI_MAX);
-    double left = level * seq->volume_left / MIDI_MAX;
-    double right = level * seq->volume_right / MIDI_MAX;
+    double left_pan = fmin(1.0, (double)(MIDI_MAX - pan) / PAN_UNIT);
+    double right_pan = fmin(1.0, (double)pan / PAN_UNIT);
+    double left = VOLUME_MAX * squared(level * seq->volume_left / MIDI_MAX * left_pan);
+    double right = VOLUME_MAX * squared(level * seq->volume_right / MIDI_MAX * right_pan);
 
-    if (pan > CENTER_PAN) {
-        left = left * (MIDI_MAX - pan) / (MIDI_MAX - CENTER_PAN);
-    } else if (pan < CENTER_PAN) {
-        right = right * pan / CENTER_PAN;
-    } else {
-        /* Centred */
-    }
     Spu_WriteRegister(voice_register(voice, VOICE_VOLUME_LEFT), (uint16_t)clamp((int)left, 0, VOLUME_MAX));
     Spu_WriteRegister(voice_register(voice, VOICE_VOLUME_RIGHT), (uint16_t)clamp((int)right, 0, VOLUME_MAX));
 }
 
-/* A voice's pitch: the note against the tone's centre and fine tuning, bent within the tone's range */
+/* A voice's pitch: the note against the tone's centre and fine tuning, in 16ths of a semitone (its top 4 bits), bent
+ * within the tone's range. 117 of the PS1's 119 pitches for the title's music are these, the others 1 below */
 static void voice_pitch(int voice) {
     const Voice *v = &s_Voices[voice];
     const Channel *channel = &s_Seps[v->sep].sequences[v->seq].channels[v->channel];
     int bend = channel->bend - BEND_CENTER;
     double range = bend >= 0 ? v->tone[TONE_BEND_MAX] : v->tone[TONE_BEND_MIN];
-    double semitones = v->note - v->tone[TONE_CENTER] + v->tone[TONE_SHIFT] / FINE_STEPS +
+    double semitones = v->note - v->tone[TONE_CENTER] + (v->tone[TONE_SHIFT] >> FINE_SHIFT) / FINE_STEPS +
                        range * bend / BEND_CENTER;
     double pitch = PITCH_ONE * pow(2.0, semitones / SEMITONES);
 
@@ -654,6 +661,7 @@ static void run_events(int access, int seq) {
 
     while (s->state == SEQ_PLAYING && s->delta <= 0) {
         uint8_t status;
+        uint8_t previous = s->running;
         int channel;
 
         if (s->position >= s->end) {
@@ -667,17 +675,19 @@ static void run_events(int access, int seq) {
         }
         channel = status & STATUS_CHANNEL;
         if (status == META) {
+            /* A SEQ's meta events carry no length: a tempo's 3 bytes follow its type straight away */
             uint8_t type = *s->position++;
-            uint32_t length = read_variable(&s->position);
 
+            s->running = previous;
             if (type == META_TEMPO) {
                 s->tempo = big_endian(s->position, SEQ_TEMPO_BYTES);
+                s->position += SEQ_TEMPO_BYTES;
             } else if (type == META_END) {
                 s->position = s->end;
             } else {
-                /* Another meta event */
+                Host_Log("libsnd: meta event 0x%02X not played", type);
+                s->position = s->end;
             }
-            s->position += type == META_END ? 0 : length;
         } else if ((status & STATUS_KIND) == NOTE_ON && s->position[1] != 0) {
             note_on(access, seq, channel, s->position[0], s->position[1]);
             s->position += EVENT_DATA_BYTES;

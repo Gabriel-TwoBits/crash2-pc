@@ -151,14 +151,19 @@ matching"):
      (0x8004FE38), by their arguments and uses in decomp's `src/game/800324A8.c` and `800123F0.c`; the structures'
      layouts from how the game fills them. The reverb's presets are psx-spx's. The game's own sound effects go
      through them.
-   - **Music (done, approximate):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats,
-     ticked at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below
-     `SsSetReservedVoice`'s count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4) and
-     SsSepSetDecrescendo (0x80052B4C) by their arguments and uses. The title's and the demos' music plays (3,000 game
-     frames headless: 3 sequences started, about 400 notes). The VAB's halfword at 0x12 is its programs' count itself,
-     not less one: the title's VAB has 13 programs, and its 30 VAG sizes, read after 13 tone blocks, add up to its
-     body's 0x3E6B0 bytes. libsnd's own formulas for a note's volume, pan and pitch aren't documented: these are MIDI's
-     usual ones, unchecked against the PS1. The mix reaches full scale in places with the sound effects alone (peaks of
-     32,766 over a second), the music adding about 30% to its level.
-   - **Left:** the music's levels against the PS1's; the memory card in files.
+   - **Music (done):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats, ticked at
+     each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below `SsSetReservedVoice`'s
+     count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4) and SsSepSetDecrescendo
+     (0x80052B4C) by their arguments and uses. Two facts of the formats psx-spx leaves out: the VAB's halfword at 0x12
+     is its programs' count itself, not less one (the title's VAB has 13 programs, and its 30 VAG sizes, read after 13
+     tone blocks, add up to its body's 0x3E6B0 bytes), and a SEQ's meta events carry no length (a tempo, FF 51, is
+     followed by its 3 bytes). libsnd's formulas are measured: the SPU registers the PS1's libsnd writes in PCSX-Redux,
+     caught with a write breakpoint, against the port's for the first 2,660 ticks of the intro's and the title's music.
+     A side's volume is 0x3FFF times the square of the product of the velocity, the tone's and the VAB's volumes (each
+     over 127) and the side's pan factor (the pan over 63, at most 1); the fine tuning counts 16ths of a semitone (the
+     tone's byte shifted right 3). The 327 notes then start on the same samples at the same ticks, 323 at the same pitch
+     and the PS1's other 4 one below, their volumes within 2 of the PS1's. In the second piece some notes start a tick
+     later than the PS1's.
+   - **Left:** the programs', channels' and sequences' volumes and pans, the pitch bend's range and the tick's rounding,
+     which the measured music doesn't exercise or shows a tick apart; the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.
