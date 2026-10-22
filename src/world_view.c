@@ -8,15 +8,18 @@
 /* The world's polygons beside the camera's view, for the wide view (the 16:9 shape). The game draws only the polygons
  * its camera path's sort list holds at the camera's node (an SLST entry: the list at the path's first node, then each
  * node's delta from the one before), made for a 4:3 view: wider, the edges showed the background where the world
- * stopped. So the list drawn is the camera's own with the polygons of the lists NODES_AROUND nodes ahead and behind
- * added, each placed after the polygon it follows in its own list (the drawing goes by its depth slots, the order
- * within one alone), of the worlds the camera's list draws from (another's may not be loaded). The lists ahead and
- * behind are decoded from the camera's by the game's own decoder.
- * More polygons take more primitives than the game's frame buffers hold (76 of their 89 KB used on Turtle Woods): with
- * the wide view chosen, its frame buffers are the host's own, larger, from the level's opening or from the end of the
- * frame it was chosen in. The objects come and go as the game's draw lists have them: one at the edge may still come
- * in late.
- * TRADEOFF: a fixed count of nodes around; how far a node reaches across differs from path to path */
+ * stopped. So the list drawn is the camera's own with polygons added:
+ * - on the side-on paths, those of the lists NODES_AROUND nodes ahead and behind, each placed after the polygon it
+ *   follows in its own list (the drawing goes by its depth slots, the order within one alone), of the worlds the
+ *   camera's list draws from (another's may not be loaded), decoded from the camera's by the game's own decoder;
+ * - on every path, the loaded worlds' polygons no list added that show beside the 4:3 picture, found by projecting
+ *   their corners as the GTE will, placed before the camera's.
+ * More polygons take more primitives than the game's frame buffers hold (76 of their 89 KB used on Turtle Woods, 102
+ * with the polygons added): with the wide view chosen, its frame buffers are the host's own, larger, from the level's
+ * opening or from the end of the frame it was chosen in. The objects come and go as the game's draw lists have them:
+ * one at the edge may still come in late.
+ * TRADEOFF: a fixed count of nodes around; how far a node reaches across differs from path to path. The polygons
+ * beside go first within a depth slot, in no order of the game's lists; their order would take a sort by depth */
 
 #define NODES_AROUND 12
 /* The camera paths that look at the world side-on, whose nodes ahead and behind lie across the view (path kinds 3 and
@@ -48,6 +51,67 @@
 /* The frame buffers' primitives: the PlayStation's 0x16400 bytes a frame (twice the PAL's), the host's larger */
 #define HOST_PRIMITIVE_BYTES 0x40000
 #define HOST_FRAME_BUFFERS 2
+
+/* The worlds Sys_MainLoop copies into the scratchpad from 0x280, 32 bytes each (decomp's include/game/world.h,
+ * WorldBlock), from the zone's first item: a count, then 12 words a world, read as Sys_MainLoop reads them (from the
+ * word at 0x2C on, a world's header 6 words before it), the header counting its vertices, triangles and quads
+ * (decomp's 800111B0.c) */
+#define SCRATCH_WORLDS 0x280
+#define WORLDS 8
+#define WORLD_BLOCK_WORDS 8
+#define BLOCK_OFFSET_XY 0
+#define BLOCK_OFFSET_Z 1
+#define BLOCK_TRIANGLES 2
+#define BLOCK_QUADS 3
+#define BLOCK_VERTICES 4
+#define ZONE_ITEMS 0x10
+#define ZONE_WORLD_FIRST 0x2C
+#define ZONE_WORLD_WORDS 12
+#define ZONE_WORLD_HEADER (-6)
+#define HEADER_VERTICES 4
+#define HEADER_TRIANGLES 5
+#define HEADER_QUADS 6
+/* An entry's kind and index (decomp's 80039D2C.c): a triangle, a quad's halves and the quad */
+#define KIND_TRIANGLE 0
+#define KIND_QUAD_FIRST 0x800
+#define KIND_QUAD_LAST 0x1000
+#define KIND_QUAD 0x1800
+#define ENTRY_INDEX_MASK 0x7FF
+#define QUAD_RECORD_WORDS 2
+/* A polygon's vertices, 12-bit indices from its words' tops; a vertex's position bits (its word a VXY pair, its
+ * halfword z) */
+#define VERTEX_HIGH_SHIFT 20
+#define VERTEX_LOW_SHIFT 8
+#define VERTEX_HALF_SHIFT 4
+#define VERTEX_INDEX_MASK 0xFFF
+#define VERTEX_MASK 0xFFF0FFF0u
+#define VERTEX_Z_MASK 0xFFF0
+#define PAIR_MASK 0xFFFEFFFFu
+#define HALF_SHIFT 16
+#define TRIANGLE_CORNERS 3
+#define QUAD_CORNERS 4
+/* The GTE's registers in the host's memory (host.h, decomp's include/gte.h): the rotation's five words, the screen's
+ * offsets (16.16) and its distance H */
+extern unsigned int g_HostGte[];
+#define GTE_CONTROL 32
+#define GTE_RT11RT12 0
+#define GTE_RT13RT21 1
+#define GTE_RT22RT23 2
+#define GTE_RT31RT32 3
+#define GTE_RT33 4
+#define GTE_OFX 24
+#define GTE_OFY 25
+#define GTE_H 26
+#define GTE_H_MASK 0xFFFF
+#define GTE_FRACTION_SHIFT 12
+/* The GTE divides H by a depth up to H / 2 at most (its division's limit): a corner nearer is not drawn right */
+#define DIVISION_LIMIT_SHARE 2
+#define AXES 3
+/* The wide view's narrowing (precise.c's): the 4:3 picture's half width a share of the screen's */
+#define WIDE_NUMERATOR 3
+#define WIDE_DENOMINATOR 4
+extern unsigned char g_HostScratchpad[];
+extern unsigned char *g_CurrentZone;
 
 /* The game's (decomp's include/game.h, 80026CA0.c) */
 int32_t Heap_Alloc(int32_t bytes);
@@ -238,6 +302,151 @@ static void write_wide(const uint16_t *camera, int count) {
     s_Wide[1] = camera[1];
 }
 
+/* A world's vertex as the camera sees it: its position from the camera (the GTE's VXY pair and VZ, as Gfx_DrawWorlds
+ * loads it) turned by the GTE's rotation */
+static void view_vertex(const uint32_t *world, uint32_t index, const int32_t rotation[AXES][AXES], int64_t *view) {
+    const unsigned char *vertices = (const unsigned char *)(uintptr_t)world[BLOCK_VERTICES];
+    uint32_t word = *(const uint32_t *)(vertices - (index + 1) * WORD_BYTES);
+    uint32_t half = *(const uint16_t *)(vertices + index * sizeof(uint16_t));
+    uint32_t pair = ((word & VERTEX_MASK) + world[BLOCK_OFFSET_XY]) & PAIR_MASK;
+    int64_t position[AXES];
+    int axis;
+
+    position[0] = (int16_t)pair;
+    position[1] = (int16_t)(pair >> HALF_SHIFT);
+    position[2] = (int16_t)((half & VERTEX_Z_MASK) + world[BLOCK_OFFSET_Z]);
+    for (axis = 0; axis < AXES; axis++) {
+        view[axis] = (rotation[axis][0] * position[0] + rotation[axis][1] * position[1] +
+                      rotation[axis][2] * position[2]) >> GTE_FRACTION_SHIFT;
+    }
+}
+
+static void gte_rotation(int32_t rotation[AXES][AXES]) {
+    const unsigned int *control = &g_HostGte[GTE_CONTROL];
+
+    rotation[0][0] = (int16_t)control[GTE_RT11RT12];
+    rotation[0][1] = (int16_t)(control[GTE_RT11RT12] >> HALF_SHIFT);
+    rotation[0][2] = (int16_t)control[GTE_RT13RT21];
+    rotation[1][0] = (int16_t)(control[GTE_RT13RT21] >> HALF_SHIFT);
+    rotation[1][1] = (int16_t)control[GTE_RT22RT23];
+    rotation[1][2] = (int16_t)(control[GTE_RT22RT23] >> HALF_SHIFT);
+    rotation[2][0] = (int16_t)control[GTE_RT31RT32];
+    rotation[2][1] = (int16_t)(control[GTE_RT31RT32] >> HALF_SHIFT);
+    rotation[2][2] = (int16_t)control[GTE_RT33];
+}
+
+/* Whether a polygon shows beside the 4:3 picture: every corner in front of the camera, past the GTE's division's
+ * limit, and its projected bounds on the screen, past the 4:3 picture's edge on one side */
+static int beside(const uint32_t *world, const uint32_t *corners, int count, const int32_t rotation[AXES][AXES],
+                  uint32_t vertex_count) {
+    int64_t h = g_HostGte[GTE_CONTROL + GTE_H] & GTE_H_MASK;
+    int64_t half_width = (int64_t)(g_HostGte[GTE_CONTROL + GTE_OFX] >> HALF_SHIFT);
+    int64_t half_height = (int64_t)(g_HostGte[GTE_CONTROL + GTE_OFY] >> HALF_SHIFT);
+    int64_t band = half_width * WIDE_NUMERATOR / WIDE_DENOMINATOR;
+    int64_t low_x = INT64_MAX, high_x = INT64_MIN, low_y = INT64_MAX, high_y = INT64_MIN;
+    int corner;
+
+    for (corner = 0; corner < count; corner++) {
+        int64_t view[AXES];
+        int64_t x, y;
+
+        if (corners[corner] >= vertex_count) {
+            return 0;
+        } else {
+            view_vertex(world, corners[corner], rotation, view);
+        }
+        if (view[2] * DIVISION_LIMIT_SHARE <= h) {
+            return 0;
+        } else {
+            x = h * view[0] / view[2] * WIDE_NUMERATOR / WIDE_DENOMINATOR;
+            y = h * view[1] / view[2];
+        }
+        low_x = x < low_x ? x : low_x;
+        high_x = x > high_x ? x : high_x;
+        low_y = y < low_y ? y : low_y;
+        high_y = y > high_y ? y : high_y;
+    }
+    return high_x > -half_width && low_x < half_width && high_y > -half_height && low_y < half_height &&
+           (high_x > band || low_x < -band);
+}
+
+/* A polygon beside, before the camera's entries, unless a list has it */
+static void add_beside(uint16_t entry) {
+    if (s_Place[entry] != NOWHERE) {
+        return;
+    } else if (s_AddedCount < WIDE_LIST_ENTRIES - SORT_LIST_ENTRIES) {
+        s_Added[s_AddedCount] = entry;
+        s_AddedAfter[s_AddedCount] = NOWHERE;
+        s_AddedCount++;
+        s_Place[entry] = ADDED;
+    } else {
+        /* The list drawn full */
+    }
+}
+
+/* The loaded worlds' polygons beside the 4:3 picture that no list added, before all the camera's */
+static void add_worlds_beside(void) {
+    const int32_t *zone = *(const int32_t *const *)(g_CurrentZone + ZONE_ITEMS);
+    const uint32_t *worlds = (const uint32_t *)(g_HostScratchpad + SCRATCH_WORLDS);
+    int32_t rotation[AXES][AXES];
+    int count = zone[0] < WORLDS ? zone[0] : WORLDS;
+    int world;
+
+    gte_rotation(rotation);
+    for (world = 0; world < count; world++) {
+        const int32_t *header = (const int32_t *)(uintptr_t)zone[ZONE_WORLD_FIRST / WORD_BYTES +
+                                                               ZONE_WORLD_WORDS * world + ZONE_WORLD_HEADER];
+        const uint32_t *block = worlds + world * WORLD_BLOCK_WORDS;
+        uint32_t vertex_count;
+        uint32_t index;
+        uint32_t base = (uint32_t)world << ENTRY_WORLD_SHIFT;
+
+        if (header == NULL || ((uintptr_t)header & EID_TAG)) {
+            /* Not loaded */
+            continue;
+        } else {
+            vertex_count = (uint32_t)header[HEADER_VERTICES];
+        }
+        for (index = 0; index < (uint32_t)header[HEADER_TRIANGLES] && index <= ENTRY_INDEX_MASK; index++) {
+            const unsigned char *triangles = (const unsigned char *)(uintptr_t)block[BLOCK_TRIANGLES];
+            uint32_t first = *(const uint32_t *)(triangles - (index + 1) * WORD_BYTES);
+            uint32_t second = *(const uint16_t *)(triangles + index * sizeof(uint16_t));
+            uint32_t corners[TRIANGLE_CORNERS];
+
+            corners[0] = first >> VERTEX_HIGH_SHIFT;
+            corners[1] = (first >> VERTEX_LOW_SHIFT) & VERTEX_INDEX_MASK;
+            corners[2] = (second >> VERTEX_HALF_SHIFT) & VERTEX_INDEX_MASK;
+            if (beside(block, corners, TRIANGLE_CORNERS, rotation, vertex_count)) {
+                add_beside((uint16_t)(base | KIND_TRIANGLE | index));
+            } else {
+                continue;
+            }
+        }
+        for (index = 0; index < (uint32_t)header[HEADER_QUADS] && index <= ENTRY_INDEX_MASK; index++) {
+            const uint32_t *quads = (const uint32_t *)(uintptr_t)block[BLOCK_QUADS];
+            uint32_t first = quads[index * QUAD_RECORD_WORDS];
+            uint32_t second = quads[index * QUAD_RECORD_WORDS + 1];
+            uint32_t corners[QUAD_CORNERS];
+
+            if (s_Place[base | KIND_QUAD_FIRST | index] != NOWHERE ||
+                s_Place[base | KIND_QUAD_LAST | index] != NOWHERE) {
+                /* Drawn as its two triangles */
+                continue;
+            } else {
+                corners[0] = first >> VERTEX_HIGH_SHIFT;
+                corners[1] = (first >> VERTEX_LOW_SHIFT) & VERTEX_INDEX_MASK;
+                corners[2] = second >> VERTEX_HIGH_SHIFT;
+                corners[3] = (second >> VERTEX_LOW_SHIFT) & VERTEX_INDEX_MASK;
+            }
+            if (beside(block, corners, QUAD_CORNERS, rotation, vertex_count)) {
+                add_beside((uint16_t)(base | KIND_QUAD | index));
+            } else {
+                continue;
+            }
+        }
+    }
+}
+
 /* An entry by its reference if the paging has it in memory, NULL if not: as Nsf_OpenEntry finds it, without its
  * opening (which pages it in and counts a holder) */
 static unsigned char *resident(const uint32_t *reference) {
@@ -265,23 +474,18 @@ static unsigned char *resident(const uint32_t *reference) {
 
 uint16_t *Host_WorldSortList(uint16_t *camera) {
     const uint32_t *reference;
-    unsigned char *entry;
-    uint16_t *const *items;
+    unsigned char *entry = NULL;
     int count = (int16_t)camera[0];
     int index;
 
-    if (!wide() || !s_LargeBuffers || g_CameraPath == 0 || count <= 0 ||
-        (g_CameraPathKind != PATH_SIDE_ON && g_CameraPathKind != PATH_SIDE_ON_TOO)) {
+    if (!wide() || !s_LargeBuffers || g_CameraPath == 0 || count <= 0 || g_CurrentZone == NULL) {
         return camera;
-    } else {
+    } else if (g_CameraPathKind == PATH_SIDE_ON || g_CameraPathKind == PATH_SIDE_ON_TOO) {
         reference = (const uint32_t *)(uintptr_t)Ent_GetProperty(g_CameraPath, PROPERTY_SORT_LIST, 0, 0, 0,
                                                                  PROPERTY_ROW_KIND, 0, 0, 0);
-    }
-    entry = resident(reference);
-    if (entry == NULL) {
-        return camera;
+        entry = resident(reference);
     } else {
-        items = (uint16_t *const *)(entry + ENTRY_ITEMS);
+        /* Along a path into the view, the worlds beside alone */
     }
     memset(s_Place, 0xFF, sizeof(s_Place));
     s_WorldsUsed = 0;
@@ -290,8 +494,15 @@ uint16_t *Host_WorldSortList(uint16_t *camera) {
         s_WorldsUsed |= 1u << (camera[SORT_LIST_FIRST + index] >> ENTRY_WORLD_SHIFT);
     }
     s_AddedCount = 0;
-    add_from(list_at(camera, items, NODES_AROUND, FORWARD, s_Around));
-    add_from(list_at(camera, items, NODES_AROUND, BACKWARD, s_Around));
+    if (entry != NULL) {
+        uint16_t *const *items = (uint16_t *const *)(entry + ENTRY_ITEMS);
+
+        add_from(list_at(camera, items, NODES_AROUND, FORWARD, s_Around));
+        add_from(list_at(camera, items, NODES_AROUND, BACKWARD, s_Around));
+    } else {
+        /* No lists around */
+    }
+    add_worlds_beside();
     write_wide(camera, count);
     return s_Wide;
 }

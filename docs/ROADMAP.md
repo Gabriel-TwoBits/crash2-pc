@@ -307,9 +307,16 @@ matching"):
       when its page is in memory, as `Nsf_OpenEntry` finds it without opening it: opened each frame, with its wait,
       it could page in from the disc while the frame was drawn. No side-on path reached by the schedules yet: the
       lists' merging was run on Turtle Woods' paths (5,900 game frames), the game's list checked unchanged by it.
-    - **Still missing at the edges:** in the warp room the right edge's world is absent at 16:9 though the camera's
-      path (kind 4) is not side-on: its lists 12 nodes around add 2 to 4 polygons, and the absent ones reach neither
-      renderer. Open.
+    - **The worlds beside, on every path:** the lists around don't hold all that 16:9 shows (in the warp room, path
+      kind 4, they add 2 to 4 polygons; on Turtle Woods' paths into the view, nothing seen), so each frame the loaded
+      worlds' polygons are projected as the GTE will (its rotation, H and offsets, as `Gfx_DrawWorlds` finds them)
+      and those beside the 4:3 picture that no list holds are added, before the camera's: every corner past the GTE's
+      division's limit (H / 2) in front of the camera, their bounds on the screen and past the 4:3 picture's edge.
+      The worlds' headers count their vertices (word 4), triangles (5) and quads (6), checked against their tables'
+      sizes; a world not loaded has none. The warp room's right edge and Turtle Woods' corners now drawn; at most
+      897 polygons added and 102 KB of primitives a frame on Turtle Woods; the game's objects at 16:9 the same as
+      before at 6 game frames. A polygon beside goes first in its depth slot, not where the game's lists order them:
+      a few black triangles show inside the warp room's Snow Go portal.
 13. **The frame rate (done, 60 as an option).** The game's logic stays at its 30 frames a second, as on the
     PlayStation, and a frame of the picture alone is drawn between two of its (`src/between.c`, decomp's
     `FRAME_BETWEEN`, `FRAME_BETWEEN_SHOWN` and `FRAME_ENDED`, crash2-decomp d7053e9): at a game frame's end the camera
