@@ -110,6 +110,9 @@ matching"):
      its "DEMO" and timer, and back to the title. Headless with the rasterizer, about 180 vertical blanks a second; a
      change to the GPU's code that names its constants leaves the frame at blank 3,000 the same to the byte.
    - **Left:** a frame-by-frame comparison with the PlayStation build on the game clock, the levels' pictures, speed.
-7. **Input, sound, saves.** The pad from SDL3's gamepads and keyboard, the SPU and libsnd's sequencer, the memory card
-   in files.
+7. **Input, sound, saves (in progress).**
+   - **Input (done):** `src/input.c` reads the keyboard and the first gamepad through SDL3, and `src/psyq/pad.c`
+     writes them into the pad's buffer at each vertical blank: a digital pad's buttons, 0 while pressed, in psx-spx's
+     order. Without a window, no button is pressed.
+   - **Left:** the SPU and libsnd's sequencer, the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.

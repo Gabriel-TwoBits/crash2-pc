@@ -4,6 +4,7 @@
 
 #include "gpu.h"
 #include "host_log.h"
+#include "input.h"
 #include "psyq/host_psyq.h"
 #include "video.h"
 
@@ -68,7 +69,7 @@ static void start(void) {
     }
     if (s_Headless) {
         return;
-    } else if (!SDL_Init(SDL_INIT_VIDEO)) {
+    } else if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         Host_Log("no window (%s): running headless", SDL_GetError());
         s_Headless = 1;
     } else if (!SDL_CreateWindowAndRenderer("Crash Bandicoot 2", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE,
@@ -78,6 +79,7 @@ static void start(void) {
     } else {
         SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
         s_NextFrame = SDL_GetTicksNS();
+        Host_InputStart();
     }
 }
 
@@ -129,7 +131,7 @@ static void show(int width, int height) {
         if (event.type == SDL_EVENT_QUIT) {
             exit(EXIT_SUCCESS);
         } else {
-            /* Other events: input comes with milestone 7 */
+            Host_InputEvent(&event);
         }
     }
     if (s_Texture == NULL || s_Texture->w != width || s_Texture->h != height) {

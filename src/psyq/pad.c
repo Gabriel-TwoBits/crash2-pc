@@ -1,15 +1,17 @@
 #include <stddef.h>
 
+#include "input.h"
 #include "psyq/host_psyq.h"
 
 /* libapi's pad: the two buffers InitPAD gets, which the BIOS fills at each vertical blank. Port 1 holds a digital pad
- * (status 0, its kind and size 0x41, then its buttons, a bit each, 0 while pressed); port 2 holds none (status 0xFF).
- * TRADEOFF: no button is ever pressed; the host's gamepads and keyboard are milestone 7 */
+ * (status 0, its kind and size 0x41, then its buttons, a bit each, 0 while pressed: input.c's); port 2 holds none
+ * (status 0xFF) */
 
 #define PAD_CONNECTED 0x00
 #define PAD_NONE 0xFF
 #define PAD_DIGITAL 0x41
-#define BUTTONS_RELEASED 0xFF
+#define BYTE_MASK 0xFF
+#define BYTE_SHIFT 8
 #define PAD_STATUS 0
 #define PAD_KIND 1
 #define PAD_BUTTONS_LOW 2
@@ -48,10 +50,12 @@ void Host_PadVerticalBlank(void) {
     if (!s_Started || s_Port1 == NULL || s_Port1Bytes < PAD_DIGITAL_BYTES) {
         return;
     } else {
+        unsigned int released = ~Host_InputButtons();
+
         s_Port1[PAD_STATUS] = PAD_CONNECTED;
         s_Port1[PAD_KIND] = PAD_DIGITAL;
-        s_Port1[PAD_BUTTONS_LOW] = BUTTONS_RELEASED;
-        s_Port1[PAD_BUTTONS_HIGH] = BUTTONS_RELEASED;
+        s_Port1[PAD_BUTTONS_LOW] = (unsigned char)(released & BYTE_MASK);
+        s_Port1[PAD_BUTTONS_HIGH] = (unsigned char)((released >> BYTE_SHIFT) & BYTE_MASK);
     }
     if (s_Port2 != NULL && s_Port2Bytes > 0) {
         s_Port2[PAD_STATUS] = PAD_NONE;

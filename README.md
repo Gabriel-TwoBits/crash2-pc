@@ -12,8 +12,8 @@ sound, the CD, the memory card and the pad.
 
 ## Status
 
-The game's C runs on the PC from the disc image: the Naughty Dog logo, the title screen and the attract demo, its
-native code included, in a window drawn by a GPU in software. There is no sound and no input yet.
+The game's C runs on the PC from the disc image, in a window drawn by a GPU in software: the Naughty Dog logo, the
+title screen, the attract demo, and the game from the keyboard or a gamepad. There is no sound and no memory card yet.
 The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built
@@ -46,6 +46,20 @@ build/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 ```
 
 What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.
+
+## Playing
+
+| PlayStation | Keyboard | Gamepad |
+| --- | --- | --- |
+| D-pad | arrows | D-pad, left stick |
+| ✕ (jump) | X | south |
+| ▢ (spin) | Z | west |
+| ◯ | C | east |
+| △ | V | north |
+| Start | Enter | start |
+| Select | Backspace | back |
+| L1, R1 | A, S | shoulders |
+| L2, R2 | Q, W | triggers |
 
 ## How it's made: AI-assisted
 
