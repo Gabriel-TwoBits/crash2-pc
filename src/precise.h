@@ -12,8 +12,15 @@ int64_t Host_Horizontal(int64_t offset);
 void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t ofx, int32_t ofy);
 /* A game frame's end: the projections since are the next frame's */
 void Precise_NewFrame(void);
-/* The projection a vertex's position word came from, this frame or the last: its x and y's fractions past the word's
- * own and its depth; 0 if none */
-int Precise_Find(uint32_t position, float *dx, float *dy, float *depth);
+/* A projection: its x and y's fractions past its position word's own, and its depth */
+typedef struct {
+    float dx, dy;
+    float depth;
+} Projection;
+
+/* The projections a vertex's position word may have come from, this frame or the last, into found (CANDIDATES at
+ * most): their count, 0 if none */
+#define CANDIDATES 4
+int Precise_Find(uint32_t position, Projection *found);
 
 #endif /* PRECISE_H */

@@ -721,7 +721,8 @@ void Render_SetDrawingArea(uint32_t left, uint32_t top, uint32_t right, uint32_t
 
 /* A polygon's vertices' projections (precise.h), as the settings take them: their fractions (steady) and their
  * depths (unwarped). Only if each vertex has one: a polygon the GTE didn't project, the HUD's or the font's, whose
- * values a projection may share by chance, stays as written */
+ * values a projection may share by chance, stays as written. A vertex with several takes the one whose depth is
+ * nearest the polygon's others' (those with one alone), or with none alone the nearest the first vertex's first */
 static void projections_none(float *dx, float *dy, float *depth, int count) {
     int index;
 
@@ -732,9 +733,17 @@ static void projections_none(float *dx, float *dy, float *depth, int count) {
     }
 }
 
+static float depth_apart(float a, float b) {
+    return a > b ? a - b : b - a;
+}
+
 static void projections(const RasterVertex *vertices, int count, float *dx, float *dy, float *depth) {
+    Projection found[QUAD_CORNERS][CANDIDATES];
+    int counts[QUAD_CORNERS];
     int steady = g_Settings[SETTING_STEADY].value;
     int unwarped = g_Settings[SETTING_PERSPECTIVE].value;
+    float reference = 0.0f;
+    int alone = 0;
     int index;
 
     projections_none(dx, dy, depth, count);
@@ -744,17 +753,35 @@ static void projections(const RasterVertex *vertices, int count, float *dx, floa
         /* Looked up */
     }
     for (index = 0; index < count; index++) {
-        if (!Precise_Find(vertices[index].position, &dx[index], &dy[index], &depth[index])) {
-            projections_none(dx, dy, depth, count);
+        counts[index] = Precise_Find(vertices[index].position, found[index]);
+        if (counts[index] == 0) {
             return;
-        } else if (!steady) {
-            dx[index] = 0.0f;
-            dy[index] = 0.0f;
-        } else if (!unwarped) {
-            depth[index] = 1.0f;
+        } else if (counts[index] == 1) {
+            reference += found[index][0].depth;
+            alone++;
         } else {
-            /* Both */
+            /* Chosen below */
         }
+    }
+    if (alone > 0) {
+        reference /= (float)alone;
+    } else {
+        reference = found[0][0].depth;
+    }
+    for (index = 0; index < count; index++) {
+        const Projection *chosen = &found[index][0];
+        int candidate;
+
+        for (candidate = 1; candidate < counts[index]; candidate++) {
+            if (depth_apart(found[index][candidate].depth, reference) < depth_apart(chosen->depth, reference)) {
+                chosen = &found[index][candidate];
+            } else {
+                continue;
+            }
+        }
+        dx[index] = steady ? chosen->dx : 0.0f;
+        dy[index] = steady ? chosen->dy : 0.0f;
+        depth[index] = unwarped ? chosen->depth : 1.0f;
     }
 }
 

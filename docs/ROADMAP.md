@@ -275,8 +275,11 @@ matching"):
     GPU renderer finds each vertex's projection by its value, this game frame's or the last's. A polygon is moved by
     its vertices' fractions (STEADY) and its texture and colours stepped with their depths (UNWARPED) only when each of
     its vertices has one: a polygon the GTE didn't project (the font's, the HUD's) stays as written. On the demo some
-    99.8% of the polygons drawn have all theirs. TRADEOFF: two vertices projected to the same pixel in a frame share
-    the later's; following each value through the game's memory (PGXP) would tell them apart. Both are options, off
+    99.8% of the polygons drawn have all theirs. Vertices projected to the same pixel in a frame (4% of those drawn on
+    Turtle Woods, Crash's before the walls behind him) keep a projection each; a polygon's vertex takes the one whose
+    depth is nearest its other vertices'. Taking the later alone, 2.2% of the vertices drawn took another's, and their
+    polygons' textures flickered as Crash moved. TRADEOFF: following each value through the game's memory (PGXP) would
+    tell them apart for sure. Both are options, off
     as the PlayStation draws, shown with the GPU renderer.
 12. **Widescreen (done).** The shape's third value, 16:9: decomp's GTE model lets a host narrow each projection's
     horizontal offset from the screen's centre (`GTE_HORIZONTAL`, crash2-decomp f7eb8a3), which the port does by 3/4,

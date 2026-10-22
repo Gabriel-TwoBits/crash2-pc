@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdint.h>
 
 #include "precise.h"
@@ -10,8 +11,10 @@
  * The GTE model's projection (decomp's include/gte.h) hands over the vertex's view coordinates before their rounding:
  * its position is computed again here with their fractions, and kept with its depth by the value the game wrote. The
  * game copies that value from the GTE into its primitives, through its scratchpad or not: the GPU renderer finds it
- * by the value again. TRADEOFF: two vertices projected to the same pixel in a frame keep the later's fraction and
- * depth; tracking each value's way through the game's memory (PGXP) would tell them apart */
+ * by the value again. Vertices projected to the same pixel in a frame (Crash's before a wall's, 0.7% of them on Turtle
+ * Woods) are kept each, up to CANDIDATES: the renderer takes for a polygon's vertex the one whose depth is nearest its
+ * other vertices'. TRADEOFF: following each value's way through the game's memory (PGXP) would tell them apart
+ * for sure */
 
 #define SLOTS 16384
 #define SLOT_MASK (SLOTS - 1)
@@ -29,14 +32,17 @@
 #define WIDE_NUMERATOR 3
 #define WIDE_DENOMINATOR 4
 
+/* Two projections of a pixel within this share of each other's depth are one vertex's, projected again */
+#define SAME_DEPTH 0.01
+
 typedef struct {
     uint32_t key;
     uint32_t generation;
-    float dx, dy;
-    float depth;
-} Projection;
+    int count;
+    Projection projections[CANDIDATES];
+} Slot;
 
-static Projection s_Slots[SLOTS];
+static Slot s_Slots[SLOTS];
 /* Starts past 1, so an empty slot's 0 is no frame's */
 static uint32_t s_Generation = 2;
 
@@ -65,7 +71,7 @@ static uint32_t hash(uint32_t key) {
     return (key * HASH_MULTIPLIER) >> HASH_SHIFT;
 }
 
-static int recent(const Projection *slot) {
+static int recent(const Slot *slot) {
     return slot->generation + 1 >= s_Generation;
 }
 
@@ -73,8 +79,10 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
     double z = (double)view[2] / VIEW_ONE;
     double x, y, dx, dy;
     uint32_t first = hash(sxy);
-    Projection *slot = &s_Slots[first & SLOT_MASK];
+    Slot *slot = &s_Slots[first & SLOT_MASK];
+    Projection *kept;
     int probe;
+    int index;
 
     if (z <= 0.0) {
         return;
@@ -90,7 +98,7 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
         /* Kept: its own slot, else a free or old one along the probes, else the first */
     }
     for (probe = 0; probe < PROBES; probe++) {
-        Projection *candidate = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
+        Slot *candidate = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
 
         if (candidate->key == sxy || !recent(candidate)) {
             slot = candidate;
@@ -99,29 +107,53 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
             continue;
         }
     }
-    slot->key = sxy;
-    slot->generation = s_Generation;
-    slot->dx = (float)dx;
-    slot->dy = (float)dy;
-    slot->depth = (float)z;
+    if (slot->key != sxy || slot->generation != s_Generation) {
+        slot->key = sxy;
+        slot->generation = s_Generation;
+        slot->count = 0;
+    } else {
+        /* This frame's pixel again */
+    }
+    kept = NULL;
+    for (index = 0; index < slot->count; index++) {
+        double apart = (double)slot->projections[index].depth - z;
+
+        if (apart < z * SAME_DEPTH && apart > -z * SAME_DEPTH) {
+            kept = &slot->projections[index];
+            break;
+        } else {
+            continue;
+        }
+    }
+    if (kept != NULL) {
+        /* The same vertex's */
+    } else if (slot->count < CANDIDATES) {
+        kept = &slot->projections[slot->count++];
+    } else {
+        kept = &slot->projections[CANDIDATES - 1];
+    }
+    kept->dx = (float)dx;
+    kept->dy = (float)dy;
+    kept->depth = (float)z;
 }
 
 void Precise_NewFrame(void) {
     s_Generation++;
 }
 
-int Precise_Find(uint32_t position, float *dx, float *dy, float *depth) {
+int Precise_Find(uint32_t position, Projection *found) {
     uint32_t first = hash(position);
     int probe;
+    int index;
 
     for (probe = 0; probe < PROBES; probe++) {
-        const Projection *slot = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
+        const Slot *slot = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
 
         if (slot->key == position && recent(slot)) {
-            *dx = slot->dx;
-            *dy = slot->dy;
-            *depth = slot->depth;
-            return 1;
+            for (index = 0; index < slot->count; index++) {
+                found[index] = slot->projections[index];
+            }
+            return slot->count;
         } else {
             continue;
         }
