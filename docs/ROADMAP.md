@@ -102,7 +102,9 @@ matching"):
      3,413 video cycles at 53.693175 MHz). `CRASH2_HEADLESS` runs without a window; `CRASH2_DUMP=DIR` writes the display
      every `CRASH2_DUMP_EVERY` blanks as PPM, all of VRAM with `CRASH2_DUMP_VRAM`.
    - **SDL3:** 3.2.10 from its release, pinned by SHA-256 and built as a shared library beside the program. Static, it
-     took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for.
+     took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for. Its Wayland window needs the 32-bit
+     `libwayland-egl1` and `libwayland-cursor0` (README.md); without them it found no video device. X11 isn't built:
+     its CMake finds no 32-bit `libX11.so`.
    - **Run:** the Naughty Dog logo over its nebula, then the title screen with its menu, as the PlayStation shows them
      (decomp's `tools/run_game.py`, `title_again`, side by side). Headless with the rasterizer, about 180 vertical
      blanks a second.

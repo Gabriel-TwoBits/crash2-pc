@@ -25,10 +25,13 @@ the port is compared against.
 
 ## Building
 
-On Debian or Ubuntu, with GCC's 32-bit support, CMake, Ninja and Python 3:
+On Debian or Ubuntu, with GCC's 32-bit support, CMake, Ninja, Python 3, and the 32-bit libraries SDL3 loads for a
+Wayland window (the i386 architecture enabled):
 
 ```sh
-sudo apt install gcc-multilib cmake ninja-build python3-venv
+sudo dpkg --add-architecture i386 && sudo apt update
+sudo apt install gcc-multilib cmake ninja-build python3-venv \
+    libwayland-client0:i386 libwayland-egl1:i386 libwayland-cursor0:i386 libxkbcommon0:i386 libegl1:i386
 git clone --recursive https://github.com/Gabriel-TwoBits/crash2-pc.git
 cd crash2-pc/decomp
 # The decompilation's split of your executable: its splitter, then your disc image
