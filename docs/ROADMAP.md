@@ -309,14 +309,25 @@ matching"):
       lists' merging was run on Turtle Woods' paths (5,900 game frames), the game's list checked unchanged by it.
     - **The worlds beside, on every path:** the lists around don't hold all that 16:9 shows (in the warp room, path
       kind 4, they add 2 to 4 polygons; on Turtle Woods' paths into the view, nothing seen), so each frame the loaded
-      worlds' polygons are projected as the GTE will (its rotation, H and offsets, as `Gfx_DrawWorlds` finds them)
-      and those beside the 4:3 picture that no list holds are added, before the camera's: every corner past the GTE's
-      division's limit (H / 2) in front of the camera, their bounds on the screen and past the 4:3 picture's edge.
-      The worlds' headers count their vertices (word 4), triangles (5) and quads (6), checked against their tables'
-      sizes; a world not loaded has none. The warp room's right edge and Turtle Woods' corners now drawn; at most
-      897 polygons added and 102 KB of primitives a frame on Turtle Woods; the game's objects at 16:9 the same as
-      before at 6 game frames. A polygon beside goes first in its depth slot, not where the game's lists order them:
-      a few black triangles show inside the warp room's Snow Go portal.
+      worlds' polygons are projected as the GTE will (its rotation, H and offsets, as `Gfx_DrawWorlds` finds them;
+      a corner nearer than its division's limit, H / 2, at twice its offset) and those beside the 4:3 picture that
+      no list holds are added: every corner in front of the camera, their bounds on the screen and past the 4:3
+      picture's edge, with a 16-pixel margin both ways. The worlds' headers count their vertices (word 4), triangles
+      (5) and quads (6), checked against their tables' sizes; a world not loaded has none. The warp room's right edge
+      and Turtle Woods' corners now drawn; at most 897 polygons added and 102 KB of primitives a frame on Turtle
+      Woods; the game's objects at 16:9 the same as before at 6 game frames.
+    - **Where the polygons beside go:** a list goes from the farthest polygon to the nearest, and `Gfx_DrawWorlds`
+      draws it from its end, linking each polygon no nearer than those before it (`link_primitive`): placed first in
+      the list, the polygons beside were drawn behind all the camera's and in no order among themselves (the warp
+      room's pillars at the right edge holed by black triangles, frame by frame, as the camera turned; black
+      triangles in the Snow Go portal). A polygon wholly beside the 4:3 picture is placed after the camera's last
+      entry as deep (the sum of the depths of the corners the game's slot sums) and the farther first among the
+      added; one reaching into the 4:3 picture stays first, behind all: the camera's list leaves it out where it
+      would show at 4:3, hidden there (a face turned away, most often, which by its depth went in front of the
+      pillars hiding it). A list may draw only a quad's first or last triangle; the other half beside is added, where
+      it was left out with the whole quad. The edges' popping counted on the warp room's dumped frames (the share of
+      black in the outer 40 columns rising for one frame) went from 5 cases to 2: a camera cut, and the Hang Eight
+      portal's inside black for 2 frames as it comes in at the edge, not traced yet.
 13. **The frame rate (done, 60 as an option).** The game's logic stays at its 30 frames a second, as on the
     PlayStation, and a frame of the picture alone is drawn between two of its (`src/between.c`, decomp's
     `FRAME_BETWEEN`, `FRAME_BETWEEN_SHOWN` and `FRAME_ENDED`, crash2-decomp d7053e9): at a game frame's end the camera
