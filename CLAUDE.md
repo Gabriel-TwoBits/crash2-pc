@@ -22,8 +22,10 @@ A session takes the first milestone not done and updates docs/ROADMAP.md with wh
 
 ## Building
 
-Not yet: milestone 3 in docs/ROADMAP.md sets it up. The toolchain is CMake and GCC with 32-bit support (`gcc-multilib`
-on Debian), and SDL3 built for 32-bit x86.
+README.md, "Building": the decompilation split in `decomp/` (its own `.venv`, ignored there), then
+`cmake -S . -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake` and `cmake --build build`; `build/crash2`
+runs it. GCC with 32-bit support (`gcc-multilib` on Debian). SDL3 for 32-bit x86, needed from milestone 5 on, is to come
+from source: Debian's i386 package conflicts with backports' Mesa.
 
 ## Code
 

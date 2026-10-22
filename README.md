@@ -12,7 +12,8 @@ sound, the CD, the memory card and the pad.
 
 ## Status
 
-Nothing runs yet. The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
+The game's C runs on the PC up to its first read from the CD, against stubs of the PlayStation's libraries. The
+plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built
 
@@ -20,6 +21,26 @@ The decompilation is a git submodule (`decomp/`), pinned at a commit, and the on
 repository holds no copy of it. A change the port needs in that C is made in the decompilation, where the PlayStation
 executable must stay byte for byte the same, and the submodule moves to it. So the PlayStation build stays the reference
 the port is compared against.
+
+## Building
+
+On Debian or Ubuntu, with GCC's 32-bit support, CMake, Ninja and Python 3:
+
+```sh
+sudo apt install gcc-multilib cmake ninja-build python3-venv
+git clone --recursive https://github.com/Gabriel-TwoBits/crash2-pc.git
+cd crash2-pc/decomp
+# The decompilation's split of your executable: its splitter, then your disc image
+python3 -m venv .venv
+.venv/bin/pip install 'splat64[mips]==0.50.1' spimdisasm==1.42.4 rabbitizer==1.16.2
+.venv/bin/python tools/extract_disc.py "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
+.venv/bin/python configure.py
+cd ..
+cmake -S . -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake
+cmake --build build
+```
+
+What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.
 
 ## How it's made: AI-assisted
 

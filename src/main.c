@@ -1,0 +1,48 @@
+#include "host.h"
+#include "host_log.h"
+
+/* What the PlayStation's start-up (libsn's __SN_ENTRY_POINT) leaves the game: a heap from the image's end to the stack,
+ * 8 bytes under the top of the 2 MB of RAM and 4 KB deep (the executable's words D_8005F188 and D_8005F184) */
+#define PS1_RAM_BYTES 0x200000
+#define PS1_STACK_BYTES 0x1000
+#define PS1_STACK_TOP_GAP 8
+#define PS1_IMAGE_END 0x6F1F0
+#define HEAP_BYTES (PS1_RAM_BYTES - PS1_STACK_TOP_GAP - PS1_STACK_BYTES - PS1_IMAGE_END)
+/* The start-up passes the heap 4 bytes in; func_8001144C marks a word past its end */
+#define HEAP_START_OFFSET 4
+#define HEAP_SLACK_BYTES 8
+#define SCRATCHPAD_BYTES 0x400
+#define RAM_WINDOW_BYTES 0x1000000
+
+/* The heap's base and size, the start-up's words libsn's InitHeap reads */
+extern unsigned char *D_8005CB28;
+extern unsigned int D_8005CB2C;
+void func_8001144C(int *start, unsigned int bytes);
+int Game_Main(void);
+
+/* GNU ld's: the program's first and last addresses */
+extern char __executable_start[];
+extern char _end[];
+
+unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(4)));
+static unsigned char s_Heap[HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(4)));
+
+static void check_window(void) {
+    unsigned int first = (unsigned int)__executable_start;
+    unsigned int last = (unsigned int)_end;
+
+    if (first < RAM_WINDOW || last > RAM_WINDOW + RAM_WINDOW_BYTES) {
+        Host_Fatal("the program spans 0x%08X to 0x%08X, outside the 16 MB window at 0x%08X (src/host.h)", first, last,
+                   RAM_WINDOW);
+    } else {
+        Host_Log("the program spans 0x%08X to 0x%08X", first, last);
+    }
+}
+
+int main(void) {
+    check_window();
+    D_8005CB28 = s_Heap;
+    D_8005CB2C = HEAP_BYTES;
+    func_8001144C((int *)(s_Heap + HEAP_START_OFFSET), HEAP_BYTES);
+    return Game_Main();
+}
