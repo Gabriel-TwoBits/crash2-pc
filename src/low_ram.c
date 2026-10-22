@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "host_log.h"
+#include "host_text.h"
 #include "low_ram.h"
 
 /* The PlayStation reads and writes its first 64 KB, the kernel's RAM, where the game's null pointers and their fields
@@ -16,6 +17,7 @@
  * handler finds the faulting instruction's base (or index) register, points it at s_LowRam by as much, runs that one
  * instruction (the trap flag), and puts the register back unless the instruction loaded into it. Linux reports the
  * fault and the step by signals, Windows by exceptions, to a vectored handler.
+ * Only the port's own code is helped so (the game's C): a fault elsewhere, a library's thread's, stops the program.
  * TRADEOFF: s_LowRam starts zeroed where the PlayStation holds what its BIOS left; an access with no register in its
  * address, or above 64 KB, still stops the program */
 
@@ -163,7 +165,7 @@ static void on_fault(Cpu *cpu, uint32_t address) {
     int index = NO_REGISTER;
     int scale = 0;
 
-    if (address >= LOW_RAM_BYTES || s_Moved != NO_REGISTER) {
+    if (address >= LOW_RAM_BYTES || s_Moved != NO_REGISTER || !Host_InOwnCode(cpu->eip)) {
         Host_Fatal("segmentation fault at 0x%08X, instruction 0x%08X", address, cpu->eip);
     } else {
         while (is_prefix(*code)) {

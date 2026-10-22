@@ -3,6 +3,7 @@
 
 #include "host.h"
 #include "host_log.h"
+#include "host_text.h"
 #include "mips.h"
 #include "retail.h"
 
@@ -131,20 +132,6 @@ static uint32_t s_Stack[STACK_WORDS];
 static MipsCpu *s_Active;
 static void (*s_Pending)(void);
 
-/* The port's own code, whose function addresses its copy of the data holds where the retail data held the retail
- * code's: from the program's start to its text's end, as the linker names them on Linux and on Windows */
-#ifdef _WIN32
-extern char __ImageBase[];
-extern char etext[];
-#define HOST_TEXT_START __ImageBase
-#define HOST_TEXT_END etext
-#else
-extern char __executable_start[];
-extern char __etext[];
-#define HOST_TEXT_START __executable_start
-#define HOST_TEXT_END __etext
-#endif
-
 void Mips_SetImage(const uint8_t *image, uint32_t bytes) {
     s_Image = image;
     s_ImageEnd = RETAIL_CODE_START + bytes;
@@ -232,7 +219,7 @@ static uint32_t retail_word(uint32_t address, uint32_t value) {
     uint32_t original;
 
     if (s_Image != NULL && address >= RETAIL_DATA_START && address + WORD_BYTES <= s_ImageEnd &&
-        value >= (uint32_t)(uintptr_t)HOST_TEXT_START && value < (uint32_t)(uintptr_t)HOST_TEXT_END) {
+        Host_InOwnCode(value)) {
         memcpy(&original, s_Image + (address - RETAIL_CODE_START), WORD_BYTES);
         return original >= RETAIL_CODE_START && original < RETAIL_DATA_START ? original : value;
     } else {
