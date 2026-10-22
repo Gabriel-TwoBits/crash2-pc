@@ -24,6 +24,26 @@
 #define SHOTS_VARIABLE "CRASH2_GAME_CLOCK_SHOTS"
 #define SHOTS_MAX 64
 #define DUMPS_VARIABLE "CRASH2_GAME_CLOCK_DUMPS"
+/* CRASH2_GAME_CLOCK_OBJECTS=N,M,...: the game's live objects at those game frames as DIR/objects_N.txt, a line each:
+ * its address, its GOOL entry's name, subtype, state, the code word its pc is at, display mode and statuses */
+#define OBJECTS_VARIABLE "CRASH2_GAME_CLOCK_OBJECTS"
+/* A GoolObject's fields (decomp's include/game/object.h) and its GOOL entry's (include/game/nsf.h): the entry, its
+ * EID, its code (item 1) */
+#define OBJECT_EXE 0x0C
+#define OBJECT_STATE 0x1C
+#define OBJECT_STATUS_A 0xA8
+#define OBJECT_STATUS_B 0xAC
+#define OBJECT_SUBTYPE 0xB4
+#define OBJECT_PC 0xC0
+#define OBJECT_DISPLAY_MODE 0x108
+#define ENTRY_EID 0x04
+#define ENTRY_CODE_ITEM 0x14
+/* An EID's name: 5 characters of 6 bits from bit 25 down, in the game's alphabet */
+#define EID_NAME_CHARACTERS 5
+#define EID_FIRST_SHIFT 25
+#define EID_CHARACTER_BITS 6
+#define EID_CHARACTER_MASK 0x3F
+#define WORD_BYTES 4
 /* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
  * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
 #define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
@@ -59,6 +79,8 @@ static int s_Shots[SHOTS_MAX];
 static int s_ShotCount;
 static int s_Dumps[SHOTS_MAX];
 static int s_DumpCount;
+static int s_Objects[SHOTS_MAX];
+static int s_ObjectCount;
 
 typedef struct {
     int first, last;
@@ -168,6 +190,7 @@ static void start(void) {
     }
     s_ShotCount = frame_list(getenv(SHOTS_VARIABLE), s_Shots);
     s_DumpCount = frame_list(getenv(DUMPS_VARIABLE), s_Dumps);
+    s_ObjectCount = frame_list(getenv(OBJECTS_VARIABLE), s_Objects);
     if (getenv(PRESSES_VARIABLE) != NULL) {
         read_presses(getenv(PRESSES_VARIABLE));
     } else {
@@ -273,6 +296,49 @@ static void dump(void) {
     }
 }
 
+/* The game's walk over its object lists (decomp's 800158E0.c) */
+void Obj_ForEachList(void *each_list, void *each_object, void *argument);
+int Obj_ForEachDescendant(void *list, void *each_object, void *argument);
+
+static uint32_t field(const void *base, int offset) {
+    uint32_t value;
+
+    memcpy(&value, (const char *)base + offset, sizeof(value));
+    return value;
+}
+
+static int list_object(void *object, FILE *file) {
+    const unsigned char *exe = (const unsigned char *)(uintptr_t)field(object, OBJECT_EXE);
+    uint32_t eid = exe == NULL ? 0 : field(exe, ENTRY_EID);
+    uint32_t code = exe == NULL ? 0 : field(exe, ENTRY_CODE_ITEM);
+    char name[EID_NAME_CHARACTERS + 1];
+    int index;
+
+    for (index = 0; index < EID_NAME_CHARACTERS; index++) {
+        name[index] = (char)g_EidAlphabet[(eid >> (EID_FIRST_SHIFT - index * EID_CHARACTER_BITS)) & EID_CHARACTER_MASK];
+    }
+    name[EID_NAME_CHARACTERS] = '\0';
+    fprintf(file, "%08X %s subtype %u state %u pc %d display %u status %08X %08X\n", (unsigned int)(uintptr_t)object,
+            name, field(object, OBJECT_SUBTYPE), field(object, OBJECT_STATE),
+            (int)(field(object, OBJECT_PC) - code) / WORD_BYTES, field(object, OBJECT_DISPLAY_MODE),
+            field(object, OBJECT_STATUS_A), field(object, OBJECT_STATUS_B));
+    return 0;
+}
+
+static void list_objects(void) {
+    char path[PATH_BYTES];
+    FILE *file;
+
+    snprintf(path, sizeof(path), "%s/objects_%d.txt", s_Directory, s_GameFrame);
+    file = fopen(path, "wb");
+    if (file == NULL) {
+        Host_Fatal("can't write %s", path);
+    } else {
+        Obj_ForEachList((void *)Obj_ForEachDescendant, (void *)list_object, file);
+        fclose(file);
+    }
+}
+
 void Host_FrameEnding(void) {
     if (!Host_GameClock()) {
         return;
@@ -288,6 +354,11 @@ void Host_FrameEnding(void) {
         dump();
     } else {
         /* Not a dumped frame */
+    }
+    if (listed(s_Objects, s_ObjectCount, s_GameFrame)) {
+        list_objects();
+    } else {
+        /* Not a listed frame */
     }
     s_GameFrame++;
     g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);

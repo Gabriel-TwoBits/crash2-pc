@@ -48,6 +48,8 @@ is shows it by the same `game_frames.txt` hashes as before.
   `tools/run_game.py DISC.cue --schedule memory-card --against retail` saves on an empty card
   (`build/run_game/retail/memcard1.mcd`); the port with that schedule's presses and `CRASH2_MEMORY_CARD=FILE` on a new
   file (3,500 game frames) saves its own, to compare frame by frame.
+- The game's objects: `CRASH2_GAME_CLOCK_OBJECTS=N,M` lists the live objects at those game frames in
+  `DIR/objects_N.txt` (GOOL entry, subtype, state, the code word the pc is at), to find the object a change concerns.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.
