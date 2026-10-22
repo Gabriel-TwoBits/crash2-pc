@@ -96,6 +96,7 @@ set(PORT_SOURCES
     src/preferences.c
     src/audio.c
     src/game_clock.c
+    src/gool.c
     src/host_log.c
     src/input.c
     src/gpu.c

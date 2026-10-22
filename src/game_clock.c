@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "game_clock.h"
+#include "gool.h"
 #include "gpu.h"
 #include "host_log.h"
 #include "input.h"
@@ -27,23 +28,6 @@
 /* CRASH2_GAME_CLOCK_OBJECTS=N,M,...: the game's live objects at those game frames as DIR/objects_N.txt, a line each:
  * its address, its GOOL entry's name, subtype, state, the code word its pc is at, display mode and statuses */
 #define OBJECTS_VARIABLE "CRASH2_GAME_CLOCK_OBJECTS"
-/* A GoolObject's fields (decomp's include/game/object.h) and its GOOL entry's (include/game/nsf.h): the entry, its
- * EID, its code (item 1) */
-#define OBJECT_EXE 0x0C
-#define OBJECT_STATE 0x1C
-#define OBJECT_STATUS_A 0xA8
-#define OBJECT_STATUS_B 0xAC
-#define OBJECT_SUBTYPE 0xB4
-#define OBJECT_PC 0xC0
-#define OBJECT_DISPLAY_MODE 0x108
-#define ENTRY_EID 0x04
-#define ENTRY_CODE_ITEM 0x14
-/* An EID's name: 5 characters of 6 bits from bit 25 down, in the game's alphabet */
-#define EID_NAME_CHARACTERS 5
-#define EID_FIRST_SHIFT 25
-#define EID_CHARACTER_BITS 6
-#define EID_CHARACTER_MASK 0x3F
-#define WORD_BYTES 4
 /* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
  * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
 #define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
@@ -296,10 +280,6 @@ static void dump(void) {
     }
 }
 
-/* The game's walk over its object lists (decomp's 800158E0.c) */
-void Obj_ForEachList(void *each_list, void *each_object, void *argument);
-int Obj_ForEachDescendant(void *list, void *each_object, void *argument);
-
 static uint32_t field(const void *base, int offset) {
     uint32_t value;
 
@@ -310,14 +290,10 @@ static uint32_t field(const void *base, int offset) {
 static int list_object(void *object, FILE *file) {
     const unsigned char *exe = (const unsigned char *)(uintptr_t)field(object, OBJECT_EXE);
     uint32_t eid = exe == NULL ? 0 : field(exe, ENTRY_EID);
-    uint32_t code = exe == NULL ? 0 : field(exe, ENTRY_CODE_ITEM);
-    char name[EID_NAME_CHARACTERS + 1];
-    int index;
+    uint32_t code = exe == NULL ? 0 : field(exe, ENTRY_ITEMS + ENTRY_CODE_ITEM * WORD_BYTES);
+    char name[EID_NAME_BYTES];
 
-    for (index = 0; index < EID_NAME_CHARACTERS; index++) {
-        name[index] = (char)g_EidAlphabet[(eid >> (EID_FIRST_SHIFT - index * EID_CHARACTER_BITS)) & EID_CHARACTER_MASK];
-    }
-    name[EID_NAME_CHARACTERS] = '\0';
+    Host_EidName(eid, name);
     fprintf(file, "%08X %s subtype %u state %u pc %d display %u status %08X %08X\n", (unsigned int)(uintptr_t)object,
             name, field(object, OBJECT_SUBTYPE), field(object, OBJECT_STATE),
             (int)(field(object, OBJECT_PC) - code) / WORD_BYTES, field(object, OBJECT_DISPLAY_MODE),
