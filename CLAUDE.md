@@ -27,6 +27,14 @@ README.md, "Building": the decompilation split in `decomp/` (its own `.venv`, ig
 runs it. GCC with 32-bit support (`gcc-multilib` on Debian). SDL3 for 32-bit x86, needed from milestone 5 on, is to come
 from source: Debian's i386 package conflicts with backports' Mesa.
 
+## Running and testing
+
+- `build/crash2 DISC.cue` runs headless; `tools/check_layout.py` checks the game's data layout after each link.
+- The native code's test: `CRASH2_NATIVE_TRACE=build/native.trace build/crash2 DISC.cue` for a minute, then
+  `.venv/bin/python tools/check_native.py build/native.trace` (`.venv` from `tools/requirements.txt`).
+- Debugging: `CRASH2_SAMPLE=1` samples where the time goes; a fatal error aborts, and gdb reads its core dump
+  (`coredumpctl dump`). A live gdb can't follow the game past the low RAM's single steps (`src/low_ram.c`).
+
 ## Code
 
 C for what the PlayStation did, in the decompilation's style: exhaustive branching (every `if`/`else if` chain ends with
