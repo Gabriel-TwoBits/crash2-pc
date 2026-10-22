@@ -262,7 +262,7 @@ int16_t SsVabFakeHead(const uint8_t *header, int16_t vab_asked, uint32_t sample_
         return ACCESS_FAILED;
     } else {
         slot = &s_Vabs[vab];
-        programs = little_half(header + VAB_PROGRAMS_OFFSET) + 1;
+        programs = little_half(header + VAB_PROGRAMS_OFFSET);
     }
     for (index = 0; index < VAB_PROGRAM_COUNT; index++) {
         if (header[VAB_PROGRAM_TABLE + index * VAB_PROGRAM_BYTES + PROGRAM_TONES] != 0 && block < programs) {

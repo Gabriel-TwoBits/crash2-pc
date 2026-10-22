@@ -151,12 +151,14 @@ matching"):
      (0x8004FE38), by their arguments and uses in decomp's `src/game/800324A8.c` and `800123F0.c`; the structures'
      layouts from how the game fills them. The reverb's presets are psx-spx's. The game's own sound effects go
      through them.
-   - **Music (done, approximate):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's
-     formats, ticked at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below
-     `SsSetReservedVoice`'s count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4)
-     and SsSepSetDecrescendo (0x80052B4C) by their arguments and uses. The title's and the demos' music plays (3,000
-     game frames headless: 3 sequences started, about 400 notes). libsnd's own formulas for a note's volume, pan and
-     pitch aren't documented: these are MIDI's usual ones, unchecked against the PS1. The mix reaches full scale in
-     places with the sound effects alone (peaks of 32,766 over a second), the music adding about 30% to its level.
+   - **Music (done, approximate):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats,
+     ticked at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below
+     `SsSetReservedVoice`'s count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4) and
+     SsSepSetDecrescendo (0x80052B4C) by their arguments and uses. The title's and the demos' music plays (3,000 game
+     frames headless: 3 sequences started, about 400 notes). The VAB's halfword at 0x12 is its programs' count itself,
+     not less one: the title's VAB has 13 programs, and its 30 VAG sizes, read after 13 tone blocks, add up to its
+     body's 0x3E6B0 bytes. libsnd's own formulas for a note's volume, pan and pitch aren't documented: these are MIDI's
+     usual ones, unchecked against the PS1. The mix reaches full scale in places with the sound effects alone (peaks of
+     32,766 over a second), the music adding about 30% to its level.
    - **Left:** the music's levels against the PS1's; the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.
