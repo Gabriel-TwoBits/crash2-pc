@@ -47,6 +47,7 @@ add_executable(crash2
     src/main.c
     src/host_log.c
     src/gte.c
+    src/low_ram.c
     src/native.c
     src/handwritten.c
     src/psyq/events.c

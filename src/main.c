@@ -2,6 +2,7 @@
 
 #include "host.h"
 #include "host_log.h"
+#include "low_ram.h"
 #include "psyq/host_psyq.h"
 
 /* What the PlayStation's start-up (libsn's __SN_ENTRY_POINT) leaves the game: a heap from the image's end to the stack,
@@ -48,6 +49,7 @@ int main(int argc, char **argv) {
     const char *disc = argc > 1 ? argv[1] : getenv(DISC_VARIABLE);
 
     check_window();
+    Host_InstallLowRam();
     if (disc == NULL) {
         Host_Fatal("usage: crash2 DISC.cue (or DISC.iso), or " DISC_VARIABLE " set to it");
     } else {

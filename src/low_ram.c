@@ -1,0 +1,219 @@
+#define _GNU_SOURCE
+#include <signal.h>
+#include <stdint.h>
+#include <string.h>
+#include <ucontext.h>
+
+#include "host_log.h"
+#include "low_ram.h"
+
+/* The PlayStation reads and writes its first 64 KB, the kernel's RAM, where the game's null pointers and their fields
+ * land (Gool_ResolveRef's null operand, read by Gool_OpVector). Linux maps no page there, so an access faults: the
+ * handler finds the faulting instruction's base (or index) register, points it at s_LowRam by as much, runs that one
+ * instruction (the trap flag), and puts the register back unless the instruction loaded into it.
+ * TRADEOFF: s_LowRam starts zeroed where the PlayStation holds what its BIOS left; an access with no register in its
+ * address, or above 64 KB, still stops the program */
+
+#define LOW_RAM_BYTES 0x10000
+#define TRAP_FLAG 0x100
+#define LOGGED_SITES 64
+
+/* x86 instruction bytes */
+#define PREFIX_OPERAND_SIZE 0x66
+#define PREFIX_ADDRESS_SIZE 0x67
+#define PREFIX_LOCK 0xF0
+#define PREFIX_REPNE 0xF2
+#define PREFIX_REP 0xF3
+#define TWO_BYTE_ESCAPE 0x0F
+#define MODRM_MOD(byte) ((byte) >> 6)
+#define MODRM_REG(byte) (((byte) >> 3) & 7)
+#define MODRM_RM(byte) ((byte) & 7)
+#define MOD_INDIRECT 0
+#define MOD_REGISTER 3
+#define RM_SIB 4
+#define RM_DISP32 5
+#define SIB_SCALE(byte) ((byte) >> 6)
+#define SIB_INDEX(byte) (((byte) >> 3) & 7)
+#define SIB_BASE(byte) ((byte) & 7)
+#define SIB_NO_INDEX 4
+#define SIB_NO_BASE 5
+#define NO_REGISTER -1
+
+static unsigned char s_LowRam[LOW_RAM_BYTES] __attribute__((aligned(16)));
+
+/* ModRM's register numbers as the signal context holds them */
+static const int s_Gregs[] = {REG_EAX, REG_ECX, REG_EDX, REG_EBX, REG_ESP, REG_EBP, REG_ESI, REG_EDI};
+
+/* The instruction being stepped: the register moved, by how much, and the one it writes */
+static int s_Moved = NO_REGISTER;
+static uint32_t s_Delta;
+static int s_Written = NO_REGISTER;
+static uint32_t s_Logged[LOGGED_SITES];
+static int s_LoggedCount;
+
+static int is_prefix(unsigned char byte) {
+    switch (byte) {
+    case PREFIX_OPERAND_SIZE:
+    case PREFIX_LOCK:
+    case PREFIX_REPNE:
+    case PREFIX_REP:
+    case 0x26: /* segment overrides */
+    case 0x2E:
+    case 0x36:
+    case 0x3E:
+    case 0x64:
+    case 0x65:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+/* Whether the ModRM's reg field names a register operand (not an opcode's extension) */
+static int uses_reg_field(unsigned char opcode, int two_byte) {
+    if (two_byte) {
+        return opcode == 0xB6 || opcode == 0xB7 || opcode == 0xBE || opcode == 0xBF || opcode == 0xAF ||
+               (opcode >= 0x40 && opcode <= 0x4F);
+    } else if (opcode < 0x40) {
+        return (opcode & 7) <= 3;
+    } else {
+        return opcode >= 0x84 && opcode <= 0x8B;
+    }
+}
+
+/* mov, movzx and movsx from memory: the register takes the loaded value whatever it held */
+static int loads_register(unsigned char opcode, int two_byte) {
+    if (two_byte) {
+        return opcode == 0xB6 || opcode == 0xB7 || opcode == 0xBE || opcode == 0xBF;
+    } else {
+        return opcode == 0x8A || opcode == 0x8B;
+    }
+}
+
+/* add and sub into a register: one moved by s_Delta comes out moved by as much */
+static int adds_into_register(unsigned char opcode, int two_byte) {
+    return !two_byte && (opcode == 0x02 || opcode == 0x03 || opcode == 0x2A || opcode == 0x2B);
+}
+
+static void log_site(uint32_t eip, uint32_t address) {
+    int index;
+
+    for (index = 0; index < s_LoggedCount; index++) {
+        if (s_Logged[index] == eip) {
+            return;
+        } else {
+            /* Another site */
+        }
+    }
+    if (s_LoggedCount < LOGGED_SITES) {
+        s_Logged[s_LoggedCount++] = eip;
+        Host_Log("low RAM: 0x%08X reads or writes 0x%04X", eip, address);
+    } else {
+        /* Enough sites logged */
+    }
+}
+
+static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) {
+    ucontext_t *context = context_pointer;
+    greg_t *gregs = context->uc_mcontext.gregs;
+    uint32_t address = (uint32_t)(uintptr_t)info->si_addr;
+    const unsigned char *code = (const unsigned char *)(uintptr_t)gregs[REG_EIP];
+    int two_byte = 0;
+    unsigned char opcode;
+    unsigned char modrm;
+    int base = NO_REGISTER;
+    int index = NO_REGISTER;
+    int scale = 0;
+
+    (void)signal_number;
+    if (address >= LOW_RAM_BYTES || s_Moved != NO_REGISTER) {
+        Host_Fatal("segmentation fault at 0x%08X, instruction 0x%08X", address, (uint32_t)gregs[REG_EIP]);
+    } else {
+        while (is_prefix(*code)) {
+            code++;
+        }
+    }
+    if (*code == PREFIX_ADDRESS_SIZE) {
+        Host_Fatal("low RAM: 16-bit addressing at 0x%08X", (uint32_t)gregs[REG_EIP]);
+    } else if (*code == TWO_BYTE_ESCAPE) {
+        two_byte = 1;
+        opcode = code[1];
+        modrm = code[2];
+        code += 3;
+    } else {
+        opcode = code[0];
+        modrm = code[1];
+        code += 2;
+    }
+    if (MODRM_MOD(modrm) == MOD_REGISTER || (MODRM_MOD(modrm) == MOD_INDIRECT && MODRM_RM(modrm) == RM_DISP32)) {
+        Host_Fatal("low RAM: no register in the address of 0x%08X's access to 0x%04X", (uint32_t)gregs[REG_EIP],
+                   address);
+    } else if (MODRM_RM(modrm) == RM_SIB) {
+        unsigned char sib = *code;
+
+        if (!(SIB_BASE(sib) == SIB_NO_BASE && MODRM_MOD(modrm) == MOD_INDIRECT)) {
+            base = SIB_BASE(sib);
+        } else {
+            /* disp32 in place of a base */
+        }
+        if (SIB_INDEX(sib) != SIB_NO_INDEX) {
+            index = SIB_INDEX(sib);
+            scale = SIB_SCALE(sib);
+        } else {
+            /* No index */
+        }
+    } else {
+        base = MODRM_RM(modrm);
+    }
+    if (base != NO_REGISTER) {
+        s_Moved = base;
+    } else if (index != NO_REGISTER && scale == 0) {
+        s_Moved = index;
+    } else {
+        Host_Fatal("low RAM: no register to move in 0x%08X's address", (uint32_t)gregs[REG_EIP]);
+    }
+    log_site((uint32_t)gregs[REG_EIP], address);
+    s_Written = NO_REGISTER;
+    if (!uses_reg_field(opcode, two_byte) || MODRM_REG(modrm) != s_Moved) {
+        /* The moved register is only the address's */
+    } else if (loads_register(opcode, two_byte)) {
+        s_Written = s_Moved;
+    } else if (adds_into_register(opcode, two_byte)) {
+        /* Put back after the step as an address register would be */
+    } else {
+        Host_Fatal("low RAM: 0x%08X uses its address register as an operand too", (uint32_t)gregs[REG_EIP]);
+    }
+    s_Delta = (uint32_t)(uintptr_t)s_LowRam;
+    gregs[s_Gregs[s_Moved]] += s_Delta;
+    gregs[REG_EFL] |= TRAP_FLAG;
+}
+
+/* After the stepped instruction: the moved register back, unless the instruction loaded into it */
+static void on_step(int signal_number, siginfo_t *info, void *context_pointer) {
+    ucontext_t *context = context_pointer;
+    greg_t *gregs = context->uc_mcontext.gregs;
+
+    (void)signal_number;
+    (void)info;
+    if (s_Moved == NO_REGISTER) {
+        Host_Fatal("trap at 0x%08X with no low RAM access stepping", (uint32_t)gregs[REG_EIP]);
+    } else if (s_Written != s_Moved) {
+        gregs[s_Gregs[s_Moved]] -= s_Delta;
+    } else {
+        /* The instruction loaded the register: its value stands */
+    }
+    gregs[REG_EFL] &= ~TRAP_FLAG;
+    s_Moved = NO_REGISTER;
+}
+
+void Host_InstallLowRam(void) {
+    struct sigaction action;
+
+    memset(&action, 0, sizeof(action));
+    action.sa_flags = SA_SIGINFO;
+    sigemptyset(&action.sa_mask);
+    action.sa_sigaction = on_fault;
+    sigaction(SIGSEGV, &action, NULL);
+    action.sa_sigaction = on_step;
+    sigaction(SIGTRAP, &action, NULL);
+}

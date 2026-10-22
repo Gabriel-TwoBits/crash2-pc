@@ -54,8 +54,16 @@ matching"):
      17.28 calls of `Sys_TimerHandler` a frame.
    - **SPU:** the paging waits on `func_80051328(0)` before and after a sound page's upload, which `src/psyq/libspu.c`
      answers as done.
-5. **The native code.** The interpreter of the 32 instructions the GOOL entries' native blocks use: the main loop's
-   next stop.
+5. **The native code (in progress).** `src/native.c` interprets the 32 instructions the GOOL entries' native blocks
+   use, on the registers decomp's `gool_native` sets. As on the R3000, a branch runs its delay slot, a load's register
+   takes its value one instruction late, and a division by 0 leaves the CPU's results.
+   - **Null pointers:** the PlayStation reads and writes its first 64 KB, the kernel's RAM, where Linux maps no page.
+     The game goes there through null pointers: `Gool_ResolveRef`'s null operand (0xBE0), which `Gool_OpVector`
+     reads. `src/low_ram.c` catches the fault, moves the instruction's address register onto a zeroed 64 KB copy, runs
+     that one instruction under the trap flag, and moves the register back. Four sites so far.
+   - **Run:** headless, with no input, the game runs 106,800 vertical blanks in 30 seconds without stopping, through
+     the attract demo's levels and their native code.
+   - **Left:** a differential test of the interpreter against an emulator, on the disc's blocks.
 6. **The picture.** The GTE's register moves on the host, the GPU's packets rasterized into VRAM, the display shown:
    the title screen, compared with the PlayStation build in an emulator.
 7. **Input, sound, saves.** The pad from SDL3's gamepads and keyboard, the SPU and libsnd's sequencer, the memory card

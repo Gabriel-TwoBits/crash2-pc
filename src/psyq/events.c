@@ -179,9 +179,17 @@ static void counter2_frame(void) {
     }
 }
 
+/* Headless, a line every so many blanks shows the game going on */
+#define FRAMES_PER_LOG 600
+
 void Host_VerticalBlank(void) {
     s_Frames++;
     counter2_frame();
+    if (s_Frames % FRAMES_PER_LOG == 0) {
+        Host_Log("vertical blank %d", s_Frames);
+    } else {
+        /* Between logs */
+    }
 }
 
 /* VSync(n) waits n blanks (0 the next one); a negative mode returns the blanks so far without waiting */
