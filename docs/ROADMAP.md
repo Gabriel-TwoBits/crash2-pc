@@ -232,11 +232,18 @@ matching"):
      its dialog with no error.
    - **Left:** Windows itself, which no machine here runs, and the AppImage on a desktop: their windows, sound and
      gamepads through SDL3.
-9. **Settings, in the game.** The game has no options screen: an overlay menu of the host's own, Dear ImGui (MIT)
-   through SDL3, opened over the game by F1 or the gamepad's guide button, which pauses the game while open and leaves
-   it where it was. Its choices are kept in `settings.ini` in SDL's preference folder: the window (fullscreen, size,
-   vsync, the picture's aspect), the volume, the keyboard's and the gamepad's buttons; the enhancements below as they
-   come. Closed and untouched, the game plays the same frames.
+9. **Settings, in the game (done).** The port's options sit in the game's own menus, reached with the pad: OPTIONS,
+   a third item on the title's menu, and PC OPTIONS in the pause menu's OPTIONS, before DONE. Either shows the
+   settings in the menu's place, in its font and look (a value between the font's arrows, as the pause menu's MONO
+   and STEREO: its rows hold some 12 characters), and DONE goes back. The menu's own GOOL code moves the cursor, with
+   its sounds; `src/menus.c` patches four words of each menu's code where the game loads it (TitOC's, and DispC's as
+   the warp rooms and levels load it; the title's DispC is another entry), each an operation of the host's (decomp's
+   `GOOL_HOST_OPERATION`) doing the replaced instruction's work besides its own, and only where each word holds that
+   instruction. TitOC's code already handles a third item, the PAL release's language, unreachable here: its sides
+   are left out. The settings, in `settings.ini` in the preference folder (headless, the defaults, never saved): the
+   window or full screen, the picture at 4:3 or stretched, sharp or smooth; the enhancements below add theirs. The
+   game plays the same frames but for the title menu's picture: the demo's run and the card's, their sound and the
+   card, as before.
 10. **A GPU renderer.** The GPU's packets drawn by SDL_GPU (Vulkan, Direct3D 12 or Metal) at a higher internal
     resolution (2×, 4×, the display's), with the PlayStation's VRAM as a texture: 24-bit colour without the dithering,
     optional texture filtering and anti-aliasing. The software renderer stays, the reference the frames' hashes and the

@@ -8,6 +8,7 @@
 #include "gpu.h"
 #include "host_log.h"
 #include "input.h"
+#include "menus.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
 
@@ -316,6 +317,7 @@ static void list_objects(void) {
 }
 
 void Host_FrameEnding(void) {
+    Host_PatchMenus();
     if (!Host_GameClock()) {
         return;
     } else {

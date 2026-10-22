@@ -7,6 +7,7 @@
 #include "host_log.h"
 #include "input.h"
 #include "psyq/host_psyq.h"
+#include "settings.h"
 #include "video.h"
 
 /* The display: VRAM's displayed rectangle (PutDispEnv) in an SDL3 window at 4:3, one picture a vertical blank, paced
@@ -78,10 +79,33 @@ static void start(void) {
         Host_Log("no window (%s): running headless", SDL_GetError());
         s_Headless = 1;
     } else {
-        SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        Host_ApplySettings();
         s_NextFrame = SDL_GetTicksNS();
         Host_InputStart();
         Host_AudioStart();
+    }
+}
+
+static SDL_ScaleMode scale_mode(void) {
+    return g_Settings[SETTING_SMOOTH].value ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST;
+}
+
+void Host_ApplySettings(void) {
+    SDL_RendererLogicalPresentation shape = SDL_LOGICAL_PRESENTATION_LETTERBOX;
+
+    if (s_Window == NULL) {
+        return;
+    } else if (g_Settings[SETTING_STRETCH].value) {
+        shape = SDL_LOGICAL_PRESENTATION_STRETCH;
+    } else {
+        /* 4:3, letterboxed */
+    }
+    SDL_SetWindowFullscreen(s_Window, g_Settings[SETTING_FULLSCREEN].value != 0);
+    SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, shape);
+    if (s_Texture != NULL) {
+        SDL_SetTextureScaleMode(s_Texture, scale_mode());
+    } else {
+        /* Set when the first picture makes it */
     }
 }
 
@@ -143,7 +167,7 @@ static void show(int width, int height) {
             /* The first picture */
         }
         s_Texture = SDL_CreateTexture(s_Renderer, SDL_PIXELFORMAT_XRGB8888, SDL_TEXTUREACCESS_STREAMING, width, height);
-        SDL_SetTextureScaleMode(s_Texture, SDL_SCALEMODE_NEAREST);
+        SDL_SetTextureScaleMode(s_Texture, scale_mode());
     } else {
         /* The same size */
     }

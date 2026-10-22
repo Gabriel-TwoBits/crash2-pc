@@ -89,6 +89,10 @@ too.
 | L1, R1 | A, S | shoulders |
 | L2, R2 | Q, W | triggers |
 
+The port's options are in the game's menus: OPTIONS on the title screen, and PC OPTIONS in the pause menu's OPTIONS
+(Start, then OPTIONS). Up and down choose a row, ✕, left or right change it, DONE goes back: the window or full
+screen, the picture at 4:3 or stretched, sharp or smooth. They are kept in `settings.ini` beside the memory card.
+
 The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
 `%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.
 `CRASH2_MEMORY_CARD=FILE` uses another.

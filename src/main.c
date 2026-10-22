@@ -12,6 +12,7 @@
 #include "low_ram.h"
 #include "psyq/host_psyq.h"
 #include "sampler.h"
+#include "settings.h"
 
 /* What the PlayStation's start-up (libsn's __SN_ENTRY_POINT) leaves the game: a heap from the image's end to the stack,
  * 8 bytes under the top of the 2 MB of RAM and 4 KB deep (the executable's words D_8005F188 and D_8005F184) */
@@ -105,6 +106,7 @@ int main(int argc, char **argv) {
     check_window();
     Host_InstallLowRam();
     Host_StartSampler();
+    Host_LoadSettings();
     Host_OpenDisc(Host_ChooseDisc(argc, argv));
     Host_SoundStart();
     D_8005CB28 = heap_base();

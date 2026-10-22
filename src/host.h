@@ -32,7 +32,7 @@ extern unsigned int g_HostGte[];
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 
-/* The game clock's step where a game frame ends (game_clock.c) */
+/* Where a game frame ends: the menus patched (menus.c), the game clock's step (game_clock.c) */
 #define FRAME_ENDING() Host_FrameEnding()
 void Host_FrameEnding(void);
 
@@ -40,5 +40,9 @@ void Host_FrameEnding(void);
 #define GOOL_RUN_NATIVE Host_RunNative
 struct GoolObject;
 void Host_RunNative(struct GoolObject *object, int *state_pool, int **pc, int **sp, unsigned char *frame);
+
+/* The operations of the host's patches of the game's GOOL code (menus.c) */
+#define GOOL_HOST_OPERATION Host_GoolOperation
+void Host_GoolOperation(struct GoolObject *object, unsigned int word);
 
 #endif /* HOST_H */
