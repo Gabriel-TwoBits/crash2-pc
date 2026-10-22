@@ -1,8 +1,8 @@
 #include "host_log.h"
 
 /* The PsyQ functions the game calls, each a stub that returns 0 and logs its first call.
- * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); libcd.c and
- * events.c, libcd.c, libgpu.c, libgte.c, libspu.c and pad.c hold those written so far */
+ * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); events.c,
+ * libcd.c, libgpu.c, libgte.c, libsnd.c, libspu.c and pad.c hold those written so far */
 #define PSYQ_STUB(name) \
     int name() { \
         static int called; \
@@ -56,26 +56,3 @@ PSYQ_STUB(_param)
 PSYQ_STUB(_reset)
 PSYQ_STUB(_status)
 PSYQ_STUB(_sync)
-
-/* libsnd and libspu, with the 15 functions of their objects the split leaves unnamed */
-PSYQ_STUB(SsEnd)
-PSYQ_STUB(SsInit)
-PSYQ_STUB(SsSepClose)
-PSYQ_STUB(SsSepOpen)
-PSYQ_STUB(SsSepPause)
-PSYQ_STUB(SsSepPlay)
-PSYQ_STUB(SsSepReplay)
-PSYQ_STUB(SsSeqCalledTbyT)
-PSYQ_STUB(SsSetMVol)
-PSYQ_STUB(SsSetReservedVoice)
-PSYQ_STUB(SsSetTableSize)
-PSYQ_STUB(SsSetTickMode)
-PSYQ_STUB(SsStart)
-PSYQ_STUB(SsVabClose)
-PSYQ_STUB(SsVabFakeBody)
-PSYQ_STUB(SsVabFakeHead)
-PSYQ_STUB(func_800521A8)
-PSYQ_STUB(func_800528C4)
-PSYQ_STUB(func_80052B4C)
-PSYQ_STUB(func_80056304)
-PSYQ_STUB(func_80056760)

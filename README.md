@@ -13,8 +13,8 @@ sound, the CD, the memory card and the pad.
 ## Status
 
 The game's C runs on the PC from the disc image, in a window drawn by a GPU in software: the Naughty Dog logo, the
-title screen, the attract demo, and the game from the keyboard or a gamepad. There is no sound and no memory card yet.
-The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
+title screen, the attract demo, and the game from the keyboard or a gamepad, with its sound effects and music. There
+is no memory card yet. The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built
 

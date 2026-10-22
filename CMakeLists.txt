@@ -81,6 +81,7 @@ add_executable(crash2
     src/psyq/libcd.c
     src/psyq/libgpu.c
     src/psyq/libgte.c
+    src/psyq/libsnd.c
     src/psyq/libspu.c
     src/psyq/pad.c
     src/psyq/stubs.c

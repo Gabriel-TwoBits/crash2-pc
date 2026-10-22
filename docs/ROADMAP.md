@@ -144,11 +144,19 @@ matching"):
      order. Without a window, no button is pressed.
    - **SPU (done):** SwanStation's (`third_party/swanstation/core/spu.cpp`, ADPCM voices, ADSR, reverb), driven by
      `src/spu_host.cpp` with each frame's CPU cycles, its 44.1 kHz frames to an SDL3 audio stream (`src/audio.c`).
-     `src/psyq/libspu.c` writes its registers for the libspu functions the game calls, 9 of them by addresses the
+     `src/psyq/libspu.c` writes its registers for the libspu functions the game calls, 10 of them by addresses the
      split leaves unnamed: SpuSetKey (0x80051078), SpuGetAllKeysStatus (0x8005182C), SpuSetVoiceAttr (0x800518B8),
-     SpuSetCommonAttr (0x800513D8), SpuSetTransferMode (0x800512F8), SpuSetTransferStartAddr (0x80051298), SpuWrite
-     (0x80051238), SpuSetReverbModeParam (0x800501A8), SpuSetReverb (0x8004FE38), by their arguments and uses in
-     decomp's `src/game/800324A8.c` and `800123F0.c`; the structures' layouts from how the game fills them. The
-     reverb's presets are psx-spx's. The game's own sound effects go through them.
-   - **Left:** libsnd's sequencer, for the music; the memory card in files.
+     SpuGetVoiceAttr (0x800521A8, its volumes), SpuSetCommonAttr (0x800513D8), SpuSetTransferMode (0x800512F8),
+     SpuSetTransferStartAddr (0x80051298), SpuWrite (0x80051238), SpuSetReverbModeParam (0x800501A8), SpuSetReverb
+     (0x8004FE38), by their arguments and uses in decomp's `src/game/800324A8.c` and `800123F0.c`; the structures'
+     layouts from how the game fills them. The reverb's presets are psx-spx's. The game's own sound effects go
+     through them.
+   - **Music (done, approximate):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's
+     formats, ticked at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below
+     `SsSetReservedVoice`'s count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4)
+     and SsSepSetDecrescendo (0x80052B4C) by their arguments and uses. The title's and the demos' music plays (3,000
+     game frames headless: 3 sequences started, about 400 notes). libsnd's own formulas for a note's volume, pan and
+     pitch aren't documented: these are MIDI's usual ones, unchecked against the PS1. The mix reaches full scale in
+     places with the sound effects alone (peaks of 32,766 over a second), the music adding about 30% to its level.
+   - **Left:** the music's levels against the PS1's; the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.

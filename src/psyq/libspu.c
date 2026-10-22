@@ -5,7 +5,7 @@
 #include "spu_host.h"
 
 /* libspu on the SPU (spu_host.h): the functions the game and libsnd call, from libspu's documented behaviour, as
- * writes to the SPU's registers (psx-spx, "Sound Processing Unit"). The game calls 9 of them by addresses the split
+ * writes to the SPU's registers (psx-spx, "Sound Processing Unit"). The game calls 10 of them by addresses the split
  * leaves unnamed; their names here come from their arguments and uses in decomp's src/game/800324A8.c and
  * 800123F0.c, the structures' layouts from how the game fills them */
 
@@ -350,6 +350,22 @@ void func_800518B8(const SpuVoiceAttr *attr) {
         }
         set_if(attr, VOICE_ATTR_ADSR1, voice, VOICE_ADSR_LOW, attr->adsr1);
         set_if(attr, VOICE_ATTR_ADSR2, voice, VOICE_ADSR_HIGH, attr->adsr2);
+    }
+}
+
+/* SpuGetVoiceAttr, of the one voice named: its volumes, the only attributes the game reads (Snd_AllocVoice) */
+void func_800521A8(SpuVoiceAttr *attr) {
+    int voice;
+
+    Host_SpuStart();
+    for (voice = 0; voice < VOICES && !((attr->voice >> voice) & 1); voice++) {
+        /* The voice named */
+    }
+    if (voice < VOICES) {
+        attr->volume.left = (int16_t)Spu_ReadRegister(voice_register(voice, VOICE_VOLUME_LEFT));
+        attr->volume.right = (int16_t)Spu_ReadRegister(voice_register(voice, VOICE_VOLUME_RIGHT));
+    } else {
+        /* No voice named */
     }
 }
 

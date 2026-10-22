@@ -18,6 +18,9 @@ void Host_DisplayArea(int *x, int *y, int *width, int *height, int *enabled);
 /* The SPU set up as libspu's SpuInit leaves it, on the sound libraries' first call (libspu.c) */
 void Host_SpuStart(void);
 
+/* libsnd's tick, each vertical blank: the sequences' music on by a 60th of a second (libsnd.c) */
+void SsSeqCalledTbyT(void);
+
 /* The pad buffers' refresh at a vertical blank (pad.c) */
 void Host_PadVerticalBlank(void);
 

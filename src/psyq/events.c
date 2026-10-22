@@ -198,6 +198,7 @@ void Host_VerticalBlank(void) {
     Host_PresentFrame();
     Host_PadVerticalBlank();
     counter2_frame();
+    SsSeqCalledTbyT();
     s_SpuCycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
     Host_AudioFrame((uint32_t)(s_SpuCycles / VIDEO_HZ));
     s_SpuCycles %= VIDEO_HZ;
