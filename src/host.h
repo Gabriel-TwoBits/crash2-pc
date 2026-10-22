@@ -24,6 +24,9 @@ extern unsigned int g_HostGte[];
 #define GTE_STORE_DATA(reg, lvalue) (*(unsigned int *)&(lvalue) = g_HostGte[reg])
 #define GTE_LOAD_DATA(reg, lvalue) (g_HostGte[reg] = *(unsigned int *)&(lvalue))
 
+/* The arguments the PlayStation's code passes on in registers, unnamed there */
+#define PASSED_ON(arguments...) arguments
+
 /* Operation 73's native code (native.c) */
 #define GOOL_RUN_NATIVE Host_RunNative
 struct GoolObject;
