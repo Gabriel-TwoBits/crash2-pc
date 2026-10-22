@@ -215,10 +215,12 @@ static int done_row(void) {
     return s_RowCount - 1;
 }
 
-/* Whether the options show a setting: the resolution only with the GPU renderer to draw at it */
+/* Whether the options show a setting: the GPU renderer's only with it there to draw */
 static int shown(int setting) {
     switch (setting) {
     case SETTING_RESOLUTION:
+    case SETTING_STEADY:
+    case SETTING_PERSPECTIVE:
         return Render_Active();
     default:
         return 1;

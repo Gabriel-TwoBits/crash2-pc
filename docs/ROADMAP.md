@@ -267,11 +267,17 @@ matching"):
       driver's too: it now helps only the port's own code.
     - **Left:** texture filtering, anti-aliasing; the options show 4 rows on the title and 5 in the pause menu,
       scrolling past them.
-11. **Steady polygons.** The PlayStation's vertices snap to whole pixels (the jitter) and its textures are mapped
-    without perspective (the warping). The GTE runs in the host's C: where it stores a screen coordinate
-    (`GTE_STORE_DATA` of SXY, 61 places, nearly all in the world's and the objects' renderers) it can keep the
-    coordinate's fraction and depth beside it, which the GPU renderer draws with, sub-pixel and perspective-correct. To
-    find first: how much of the game copies coordinates past the macro.
+11. **Steady polygons (done).** The GTE rounds a projected vertex to whole pixels, so the PlayStation's polygons jitter,
+    and its GPU steps a texture without the depth, so they warp. decomp's GTE model hands over each projection's view
+    coordinates before their rounding (`GTE_PROJECTED`, crash2-decomp 152ade9); `src/precise.c` computes the position
+    again with their fractions and keeps it with its depth, by the value of the SXY the GTE wrote. The game copies that
+    value into its primitives, directly or through its scratchpad (the 61 stores of the SXY registers do both), so the
+    GPU renderer finds each vertex's projection by its value, this game frame's or the last's. A polygon is moved by
+    its vertices' fractions (STEADY) and its texture and colours stepped with their depths (UNWARPED) only when each of
+    its vertices has one: a polygon the GTE didn't project (the font's, the HUD's) stays as written. On the demo some
+    99.8% of the polygons drawn have all theirs. TRADEOFF: two vertices projected to the same pixel in a frame share
+    the later's; following each value through the game's memory (PGXP) would tell them apart. Both are options, off
+    as the PlayStation draws, shown with the GPU renderer.
 12. **Widescreen.** A wider field of view through the GTE's projection, the game's culling of what falls outside a 4:3
     screen measured and widened where objects would vanish at the edges.
 13. **The frame rate.** 30 frames a second as the PlayStation runs it, or more. Much of the game measures its time by

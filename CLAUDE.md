@@ -49,7 +49,8 @@ is shows it by the same `game_frames.txt` hashes as before.
   (`build/run_game/retail/memcard1.mcd`); the port with that schedule's presses and `CRASH2_MEMORY_CARD=FILE` on a new
   file (3,500 game frames) saves its own, to compare frame by frame.
 - The GPU renderer headless: `CRASH2_HEADLESS_GPU=1` beside `CRASH2_HEADLESS=1` draws on SDL's offscreen driver,
-  `CRASH2_SETTINGS=FILE` names a settings file (`resolution=3` is 4×; headless reads none otherwise), and each
+  `CRASH2_SETTINGS=FILE` names a settings file (`resolution=3` is 4×, `steady=1` and `perspective=1` the steady
+  polygons; headless reads none otherwise), and each
   `CRASH2_GAME_CLOCK_SHOTS` frame also writes `DIR/shot_N_gpu.ppm` at the resolution. `VK_ICD_FILENAMES` picks the
   driver: `/usr/share/vulkan/icd.d/lvp_icd.json` (lavapipe, in software) or `radeon_icd.json`. The game's frames, sound
   and card stay those of the software run: the renderer only draws. `tools/linux/run.sh --gpu --window` runs the

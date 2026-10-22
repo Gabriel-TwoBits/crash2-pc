@@ -5,6 +5,7 @@
 
 #include "gpu.h"
 #include "host_log.h"
+#include "precise.h"
 #include "psyq/host_psyq.h"
 #include "render.h"
 #include "settings.h"
@@ -109,6 +110,7 @@ typedef struct {
     uint32_t limits;
     uint32_t window;
     uint32_t flags;
+    float depth;
 } DrawVertex;
 
 typedef enum {
@@ -194,6 +196,7 @@ static int create_draw_pipelines(void) {
         {4, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT, offsetof(DrawVertex, limits)},
         {5, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT, offsetof(DrawVertex, window)},
         {6, 0, SDL_GPU_VERTEXELEMENTFORMAT_UINT, offsetof(DrawVertex, flags)},
+        {7, 0, SDL_GPU_VERTEXELEMENTFORMAT_FLOAT, offsetof(DrawVertex, depth)},
     };
     SDL_GPUVertexBufferDescription buffer;
     SDL_GPUColorTargetDescription target;
@@ -703,6 +706,7 @@ static DrawVertex draw_vertex(const Shading *shading, float x, float y, uint32_t
     vertex.limits = shading->limits;
     vertex.window = shading->window;
     vertex.flags = shading->flags;
+    vertex.depth = 1.0f;
     return vertex;
 }
 
@@ -713,8 +717,48 @@ void Render_SetDrawingArea(uint32_t left, uint32_t top, uint32_t right, uint32_t
     s_Area.h = (int)(bottom - top + 1);
 }
 
+/* A polygon's vertices' projections (precise.h), as the settings take them: their fractions (steady) and their
+ * depths (unwarped). Only if each vertex has one: a polygon the GTE didn't project, the HUD's or the font's, whose
+ * values a projection may share by chance, stays as written */
+static void projections_none(float *dx, float *dy, float *depth, int count) {
+    int index;
+
+    for (index = 0; index < count; index++) {
+        dx[index] = 0.0f;
+        dy[index] = 0.0f;
+        depth[index] = 1.0f;
+    }
+}
+
+static void projections(const RasterVertex *vertices, int count, float *dx, float *dy, float *depth) {
+    int steady = g_Settings[SETTING_STEADY].value;
+    int unwarped = g_Settings[SETTING_PERSPECTIVE].value;
+    int index;
+
+    projections_none(dx, dy, depth, count);
+    if (!steady && !unwarped) {
+        return;
+    } else {
+        /* Looked up */
+    }
+    for (index = 0; index < count; index++) {
+        if (!Precise_Find(vertices[index].position, &dx[index], &dy[index], &depth[index])) {
+            projections_none(dx, dy, depth, count);
+            return;
+        } else if (!steady) {
+            dx[index] = 0.0f;
+            dy[index] = 0.0f;
+        } else if (!unwarped) {
+            depth[index] = 1.0f;
+        } else {
+            /* Both */
+        }
+    }
+}
+
 void Render_Polygon(const RasterState *state, int count, const RasterVertex *vertices) {
     DrawVertex corners[QUAD_TRIANGLE_VERTICES];
+    float dx[QUAD_CORNERS], dy[QUAD_CORNERS], depth[QUAD_CORNERS];
     Shading look;
     int low_u = BYTE_MASK, low_v = BYTE_MASK, high_u = 0, high_v = 0;
     int low_x = vertices[0].x, high_x = vertices[0].x, low_y = vertices[0].y, high_y = vertices[0].y;
@@ -745,11 +789,14 @@ void Render_Polygon(const RasterState *state, int count, const RasterVertex *ver
     } else {
         /* No texture to limit */
     }
+    projections(vertices, count, dx, dy, depth);
     for (index = 0; index < (count == TRIANGLE_VERTICES ? TRIANGLE_VERTICES : QUAD_TRIANGLE_VERTICES); index++) {
-        const RasterVertex *from = &vertices[s_QuadOrder[index]];
+        int corner = s_QuadOrder[index];
+        const RasterVertex *from = &vertices[corner];
 
-        corners[index] = draw_vertex(&look, (float)from->x, (float)from->y, from->color,
+        corners[index] = draw_vertex(&look, (float)from->x + dx[corner], (float)from->y + dy[corner], from->color,
                                      (float)(from->texcoord & BYTE_MASK), (float)(from->texcoord >> BYTE_SHIFT));
+        corners[index].depth = depth[corner];
     }
     emit(&look, corners, count == TRIANGLE_VERTICES ? TRIANGLE_VERTICES : QUAD_TRIANGLE_VERTICES);
 }

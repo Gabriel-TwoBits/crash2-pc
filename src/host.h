@@ -41,6 +41,10 @@ void Host_FrameEnding(void);
 struct GoolObject;
 void Host_RunNative(struct GoolObject *object, int *state_pool, int **pc, int **sp, unsigned char *frame);
 
+/* The GTE model's projections before their rounding (precise.c) */
+#define GTE_PROJECTED(sxy, view, h, ofx, ofy) Host_GteProjected((sxy), (const long long *)(view), (h), (ofx), (ofy))
+void Host_GteProjected(unsigned int sxy, const long long *view, unsigned int h, int ofx, int ofy);
+
 /* The operations of the host's patches of the game's GOOL code (menus.c) */
 #define GOOL_HOST_OPERATION Host_GoolOperation
 void Host_GoolOperation(struct GoolObject *object, unsigned int word);

@@ -123,6 +123,7 @@ static RasterVertex vertex(uint32_t position, uint32_t colour) {
     result.y = s_State.offset_y + sign_extend(position >> HALF_SHIFT, COORDINATE_BITS);
     result.color = colour & COLOUR_MASK;
     result.texcoord = 0;
+    result.position = position;
     return result;
 }
 

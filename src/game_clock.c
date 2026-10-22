@@ -9,6 +9,7 @@
 #include "host_log.h"
 #include "input.h"
 #include "menus.h"
+#include "precise.h"
 #include "render.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
@@ -322,6 +323,7 @@ void Host_FrameEnding(void) {
     char path[PATH_BYTES];
 
     Host_PatchMenus();
+    Precise_NewFrame();
     if (!Host_GameClock()) {
         return;
     } else {

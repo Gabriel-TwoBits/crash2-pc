@@ -10,10 +10,13 @@
 extern "C" {
 #endif
 
+/* A vertex: its position (the drawing offset added), colour and texture coordinates, and its position's word as the
+ * game wrote it, by which the GPU renderer finds its projection (precise.h) */
 typedef struct {
     int32_t x, y;
     uint32_t color;
     uint16_t texcoord;
+    uint32_t position;
 } RasterVertex;
 
 /* The state a primitive draws with: its command word (the first, colour included), the draw mode (E1's bits, a

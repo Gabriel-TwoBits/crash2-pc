@@ -92,12 +92,13 @@ too.
 
 The port's options are in the game's menus: OPTIONS on the title screen, and PC OPTIONS in the pause menu's OPTIONS
 (Start, then OPTIONS). Up and down choose a row, ✕, left or right change it, DONE goes back: the window or full
-screen, the picture at 4:3 or stretched, sharp or smooth, and the resolution (the PlayStation's, or 2 to 8 times it,
-in true colour). They are kept in `settings.ini` beside the memory card.
+screen, the picture at 4:3 or stretched, sharp or smooth, the resolution (the PlayStation's, or 2 to 8 times it, in
+true colour), the polygons steady (no longer snapped to whole pixels, which makes them jitter) and the textures
+unwarped (in perspective). They are kept in `settings.ini` beside the memory card.
 
 The resolution takes Vulkan from a 32-bit driver: on Linux the i386 Vulkan packages (`libvulkan1:i386` and
 `mesa-vulkan-drivers:i386` on Debian, what Steam installs too); on Windows the graphics card's driver. Without it the
-game shows the PlayStation's picture, and the options leave the resolution out.
+game shows the PlayStation's picture, and the options leave out the resolution, the steadiness and the perspective.
 
 The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
 `%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.

@@ -4,8 +4,8 @@
 // CLUT, or a 15-bit colour), modulated by the vertex colour, in true colour. A semi-transparent primitive's blending is
 // its pipeline's; the shader scales the colour for it
 
-layout(location = 0) noperspective in vec4 v_colour;
-layout(location = 1) noperspective in vec2 v_texcoord;
+layout(location = 0) in vec4 v_colour;
+layout(location = 1) in vec2 v_texcoord;
 layout(location = 2) flat in uint v_texture;
 layout(location = 3) flat in uint v_limits;
 layout(location = 4) flat in uint v_window;
