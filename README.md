@@ -12,8 +12,9 @@ sound, the CD, the memory card and the pad.
 
 ## Status
 
-The game's C runs on the PC up to its first read from the CD, against stubs of the PlayStation's libraries. The
-plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
+The game's C boots on the PC, headless: it reads the disc image, pages its first level in and runs its objects up to
+their first native code, against stubs of most of the PlayStation's libraries. The plan and its milestones are in
+[docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built
 
@@ -38,6 +39,7 @@ python3 -m venv .venv
 cd ..
 cmake -S . -B build -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake
 cmake --build build
+build/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 ```
 
 What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.

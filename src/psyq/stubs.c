@@ -1,7 +1,8 @@
 #include "host_log.h"
 
 /* The PsyQ functions the game calls, each a stub that returns 0 and logs its first call.
- * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7) */
+ * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); libcd.c and
+ * events.c hold those written so far */
 #define PSYQ_STUB(name) \
     int name() { \
         static int called; \
@@ -22,44 +23,22 @@ PSYQ_STUB(_card_load)
 PSYQ_STUB(_card_read)
 PSYQ_STUB(_card_write)
 PSYQ_STUB(ChangeClearPAD)
-PSYQ_STUB(CloseEvent)
-PSYQ_STUB(DisableEvent)
-PSYQ_STUB(EnableEvent)
-PSYQ_STUB(EnterCriticalSection)
-PSYQ_STUB(ExitCriticalSection)
 PSYQ_STUB(InitCARD)
 PSYQ_STUB(InitPAD)
-PSYQ_STUB(OpenEvent)
-PSYQ_STUB(SetRCnt)
 PSYQ_STUB(StartCARD)
 PSYQ_STUB(StartPAD)
-PSYQ_STUB(StartRCnt)
 PSYQ_STUB(StopCARD)
 PSYQ_STUB(StopPAD)
-PSYQ_STUB(StopRCnt)
-PSYQ_STUB(TestEvent)
 PSYQ_STUB(_new_card)
 PSYQ_STUB(erase)
 PSYQ_STUB(firstfile)
 PSYQ_STUB(format)
 PSYQ_STUB(nextfile)
 
-/* libcd */
-PSYQ_STUB(CdControl)
-PSYQ_STUB(CdControlF)
-PSYQ_STUB(CdDataSync)
-PSYQ_STUB(CdInit)
-PSYQ_STUB(CdIntToPos)
-PSYQ_STUB(CdRead)
-PSYQ_STUB(CdReadSync)
-PSYQ_STUB(CdSetDebug)
-PSYQ_STUB(CdSync)
-
 /* libetc */
 PSYQ_STUB(ResetCallback)
 PSYQ_STUB(SetVideoMode)
 PSYQ_STUB(StopCallback)
-PSYQ_STUB(VSync)
 PSYQ_STUB(restartIntr)
 PSYQ_STUB(setIntr)
 PSYQ_STUB(startIntr)
@@ -144,7 +123,6 @@ PSYQ_STUB(func_80051078)
 PSYQ_STUB(func_80051238)
 PSYQ_STUB(func_80051298)
 PSYQ_STUB(func_800512F8)
-PSYQ_STUB(func_80051328)
 PSYQ_STUB(func_800513D8)
 PSYQ_STUB(func_8005182C)
 PSYQ_STUB(func_800518B8)

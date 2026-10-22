@@ -1,5 +1,8 @@
+#include <stdlib.h>
+
 #include "host.h"
 #include "host_log.h"
+#include "psyq/host_psyq.h"
 
 /* What the PlayStation's start-up (libsn's __SN_ENTRY_POINT) leaves the game: a heap from the image's end to the stack,
  * 8 bytes under the top of the 2 MB of RAM and 4 KB deep (the executable's words D_8005F188 and D_8005F184) */
@@ -12,7 +15,6 @@
 #define HEAP_START_OFFSET 4
 #define HEAP_SLACK_BYTES 8
 #define SCRATCHPAD_BYTES 0x400
-#define RAM_WINDOW_BYTES 0x1000000
 
 /* The heap's base and size, the start-up's words libsn's InitHeap reads */
 extern unsigned char *D_8005CB28;
@@ -32,15 +34,25 @@ static void check_window(void) {
     unsigned int last = (unsigned int)_end;
 
     if (first < RAM_WINDOW || last > RAM_WINDOW + RAM_WINDOW_BYTES) {
-        Host_Fatal("the program spans 0x%08X to 0x%08X, outside the 16 MB window at 0x%08X (src/host.h)", first, last,
+        Host_Fatal("the program spans 0x%08X to 0x%08X, outside the 8 MB window at 0x%08X (src/host.h)", first, last,
                    RAM_WINDOW);
     } else {
         Host_Log("the program spans 0x%08X to 0x%08X", first, last);
     }
 }
 
-int main(void) {
+/* The disc image: the first argument, else CRASH2_DISC */
+#define DISC_VARIABLE "CRASH2_DISC"
+
+int main(int argc, char **argv) {
+    const char *disc = argc > 1 ? argv[1] : getenv(DISC_VARIABLE);
+
     check_window();
+    if (disc == NULL) {
+        Host_Fatal("usage: crash2 DISC.cue (or DISC.iso), or " DISC_VARIABLE " set to it");
+    } else {
+        Host_OpenDisc(disc);
+    }
     D_8005CB28 = s_Heap;
     D_8005CB2C = HEAP_BYTES;
     func_8001144C((int *)(s_Heap + HEAP_START_OFFSET), HEAP_BYTES);

@@ -49,13 +49,16 @@ add_executable(crash2
     src/gte.c
     src/native.c
     src/handwritten.c
+    src/psyq/events.c
+    src/psyq/libcd.c
+    src/psyq/libspu.c
     src/psyq/stubs.c
     src/psyq/bios_files.c
     ${HOST_DATA}
     $<TARGET_OBJECTS:game>)
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11 -Wall -Wextra -fno-pie>)
 target_include_directories(crash2 PRIVATE src)
-# Not position-independent: the program sits in src/host.h's window at 0x08000000, and the game's data holds absolute
+# At the PlayStation's RAM, 0x80000000 (src/host.h), and not position-independent: the game's data holds absolute
 # addresses. The BIOS's file calls go to src/psyq/bios_files.c
-target_link_options(crash2 PRIVATE -no-pie
+target_link_options(crash2 PRIVATE -no-pie -Wl,-Ttext-segment=0x80000000
     -Wl,--wrap=open -Wl,--wrap=read -Wl,--wrap=write -Wl,--wrap=close)
