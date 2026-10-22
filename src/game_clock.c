@@ -9,6 +9,7 @@
 #include "host_log.h"
 #include "input.h"
 #include "menus.h"
+#include "render.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
 
@@ -17,8 +18,9 @@
  * frame lasting two vertical blanks for the game. Each entry writes a line to DIR/game_frames.txt as run_game.lua
  * does: the game frame displayed, the vertical blank it was shown at, and a 64-bit FNV-1a over the displayed
  * rectangle's 16-bit pixels taken as 32-bit words. CRASH2_GAME_CLOCK_LAST=N ends the run after game frame N;
- * CRASH2_GAME_CLOCK_SHOTS=N,M,... writes those game frames' images as DIR/shot_N.ppm, run_game.lua's shots, and
- * CRASH2_GAME_CLOCK_DUMPS=N,M,... the game's data and bss as DIR/ram_N.bin, a 2 MB image of the RAM at the retail
+ * CRASH2_GAME_CLOCK_SHOTS=N,M,... writes those game frames' images as DIR/shot_N.ppm, run_game.lua's shots (and the
+ * GPU renderer's at its resolution as DIR/shot_N_gpu.ppm when it draws), and CRASH2_GAME_CLOCK_DUMPS=N,M,... the
+ * game's data and bss as DIR/ram_N.bin, a 2 MB image of the RAM at the retail
  * addresses (the rest zero), to compare with run_game.lua's RAM dumps */
 
 #define CLOCK_VARIABLE "CRASH2_GAME_CLOCK"
@@ -317,6 +319,8 @@ static void list_objects(void) {
 }
 
 void Host_FrameEnding(void) {
+    char path[PATH_BYTES];
+
     Host_PatchMenus();
     if (!Host_GameClock()) {
         return;
@@ -325,6 +329,8 @@ void Host_FrameEnding(void) {
     }
     if (listed(s_Shots, s_ShotCount, s_GameFrame)) {
         shot();
+        snprintf(path, sizeof(path), "%s/shot_%d_gpu.ppm", s_Directory, s_GameFrame);
+        Render_Shot(path);
     } else {
         /* Not a checkpoint */
     }

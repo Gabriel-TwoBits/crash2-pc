@@ -244,10 +244,29 @@ matching"):
    window or full screen, the picture at 4:3 or stretched, sharp or smooth; the enhancements below add theirs. The
    game plays the same frames but for the title menu's picture: the demo's run and the card's, their sound and the
    card, as before.
-10. **A GPU renderer.** The GPU's packets drawn by SDL_GPU (Vulkan, Direct3D 12 or Metal) at a higher internal
-    resolution (2×, 4×, the display's), with the PlayStation's VRAM as a texture: 24-bit colour without the dithering,
-    optional texture filtering and anti-aliasing. The software renderer stays, the reference the frames' hashes and the
-    comparisons with the PlayStation go by.
+10. **A GPU renderer (done).** `src/render.c` draws each primitive gpu.c hands the software rasterizer again, with
+    SDL_GPU on Vulkan (SPIR-V from `shaders/`, compiled by glslang at the build), into a target of VRAM's size times
+    the resolution (2, 3, 4, 6 or 8), in true colour without the dithering; the window shows the target's displayed
+    rectangle, or at the PlayStation's resolution the software picture. The software rasterizer keeps drawing: its VRAM
+    stays the game's and the textures' source, so the game plays the same frames whatever the renderer does.
+    - **Textures:** `draw.frag` reads them from the software VRAM as the GPU does (4- and 8-bit CLUTs, 15-bit), the
+      texture window applied and each coordinate held within its primitive's (no seams at the higher resolution). The
+      VRAM is uploaded again after a load, copy or fill, before the next textured draw. TRADEOFF: a draw reading what
+      the frame drew before (the framebuffer as a texture) reads it as of that upload.
+    - **Blending:** the four semi-transparencies as blend states, a texture's texels without their bit drawn opaque
+      in a pass of their own. The primitives are moved half a target pixel so the target samples at the corners of the
+      PlayStation's pixels, as its GPU does.
+    - **VRAM:** a CPU's load is drawn into the target from the software VRAM, a copy copies the target, a fill fills.
+    - **Checked:** the title, the attract demo's levels, the warp room's pause screen at 4× on lavapipe and on RADV
+      (the RX 9060 XT: the demo at some 500 game frames a second headless, the software rasterizer included), the
+      demo's and the card run's frames, sound and card the same as without it; the AppImage's window on lavapipe; Wine,
+      with no Vulkan, falls back to the software picture. Windows itself takes Vulkan from the card's driver; D3D12
+      (DXIL shaders) would serve where none is.
+    - **Found on the way:** with no window nothing waited on the GPU, and SDL_GPU's copies of the buffers ran the
+      32-bit address space out: two pictures at most are in flight. `low_ram.c` helped any thread's fault near 0, the
+      driver's too: it now helps only the port's own code.
+    - **Left:** texture filtering, anti-aliasing; the options show 4 rows on the title and 5 in the pause menu,
+      scrolling past them.
 11. **Steady polygons.** The PlayStation's vertices snap to whole pixels (the jitter) and its textures are mapped
     without perspective (the warping). The GTE runs in the host's C: where it stores a screen coordinate
     (`GTE_STORE_DATA` of SXY, 61 places, nearly all in the world's and the objects' renderers) it can keep the

@@ -6,11 +6,12 @@
 #include "preferences.h"
 #include "settings.h"
 
-/* The settings in settings.ini in the preference folder, a "key=value" line each, the value a whole number. Headless
- * (CRASH2_HEADLESS) they keep their defaults and aren't saved: a test run leaves the player's file alone */
+/* The settings in settings.ini in the preference folder, a "key=value" line each, the value a whole number, or in the
+ * file CRASH2_SETTINGS names. Headless (CRASH2_HEADLESS) only the latter: a test run leaves the player's file alone */
 
 #define SETTINGS_FILE "settings.ini"
 #define HEADLESS_VARIABLE "CRASH2_HEADLESS"
+#define FILE_VARIABLE "CRASH2_SETTINGS"
 #define PATH_BYTES 4096
 #define LINE_BYTES 256
 #define DECIMAL 10
@@ -19,6 +20,8 @@
 static const char *const s_Displays[] = {"WINDOW", "FULLSCREEN"};
 static const char *const s_Shapes[] = {"4:3", "STRETCHED"};
 static const char *const s_Smoothing[] = {"SHARP", "SMOOTH"};
+static const char *const s_Resolutions[] = {"PS1 RES", "2X RES", "3X RES", "4X RES", "6X RES", "8X RES"};
+static const int s_Scales[] = {1, 2, 3, 4, 6, 8};
 
 #define VALUE_COUNT(values) ((int)(sizeof(values) / sizeof((values)[0])))
 
@@ -26,11 +29,22 @@ Setting g_Settings[SETTING_COUNT] = {
     {"fullscreen", s_Displays, VALUE_COUNT(s_Displays), 0},
     {"stretch", s_Shapes, VALUE_COUNT(s_Shapes), 0},
     {"smooth", s_Smoothing, VALUE_COUNT(s_Smoothing), 0},
+    {"resolution", s_Resolutions, VALUE_COUNT(s_Resolutions), 0},
 };
 
-/* The file's path, 0 with none to be had (or headless) */
+_Static_assert(VALUE_COUNT(s_Scales) == VALUE_COUNT(s_Resolutions), "a scale for each resolution named");
+
+int Host_ResolutionScale(void) {
+    return s_Scales[g_Settings[SETTING_RESOLUTION].value];
+}
+
+/* The file's path, 0 with none to be had (or headless with none named) */
 static int settings_path(char *path, size_t bytes) {
-    if (getenv(HEADLESS_VARIABLE) != NULL) {
+    const char *named = getenv(FILE_VARIABLE);
+
+    if (named != NULL) {
+        return snprintf(path, bytes, "%s", named) < (int)bytes;
+    } else if (getenv(HEADLESS_VARIABLE) != NULL) {
         return 0;
     } else {
         return Host_PreferencePath(SETTINGS_FILE, path, bytes) == 0;

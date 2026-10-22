@@ -66,6 +66,21 @@ add_custom_command(
     COMMENT "Listing the libraries' retail addresses")
 set_source_files_properties(src/sdk.c PROPERTIES OBJECT_DEPENDS ${SDK_SYMBOLS})
 
+# The GPU renderer's shaders (shaders/), GLSL compiled to SPIR-V for SDL_GPU's Vulkan, each a C array in a header
+find_program(GLSLANG glslangValidator REQUIRED)
+set(SHADER_HEADERS)
+foreach(shader draw.vert draw.frag present.vert present.frag)
+    string(REPLACE "." "_" shader_name ${shader})
+    set(header ${CMAKE_BINARY_DIR}/shaders/${shader_name}.h)
+    add_custom_command(
+        OUTPUT ${header}
+        COMMAND ${GLSLANG} -V --quiet --vn ${shader_name} -o ${header} ${CMAKE_SOURCE_DIR}/shaders/${shader}
+        DEPENDS ${CMAKE_SOURCE_DIR}/shaders/${shader}
+        COMMENT "Compiling the shader ${shader}")
+    list(APPEND SHADER_HEADERS ${header})
+endforeach()
+set_source_files_properties(src/render.c PROPERTIES OBJECT_DEPENDS "${SHADER_HEADERS}")
+
 # The game's C, as the decompilation's equivalent build has it, with the host's platform macros (src/host.h)
 # The retail image's order, which the link keeps (tools/check_layout.py): the split's data, each game file's small
 # data, the bss (tools/host_data.py puts it in .data, so the host's own data can't come between)
@@ -103,6 +118,7 @@ set(PORT_SOURCES
     src/input.c
     src/gpu.c
     src/gpu_raster.cpp
+    src/render.c
     third_party/swanstation/core/gpu_sw_backend.cpp
     src/spu_host.cpp
     third_party/swanstation/core/spu.cpp
@@ -145,7 +161,7 @@ else()
     set(HOST_PIC -fPIC)
 endif()
 target_compile_options(${PORT} PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11 -Wall -Wextra ${HOST_PIC}>)
-target_include_directories(${PORT} PRIVATE src ${CMAKE_BINARY_DIR}/sdk)
+target_include_directories(${PORT} PRIVATE src ${CMAKE_BINARY_DIR}/sdk ${CMAKE_BINARY_DIR}/shaders)
 # SwanStation's rasterizer (third_party/swanstation/README.md), C++17 as it is written
 target_include_directories(${PORT} PRIVATE src/spu_shim third_party/swanstation third_party/swanstation/core)
 target_compile_options(${PORT} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++17 ${HOST_PIC}>)

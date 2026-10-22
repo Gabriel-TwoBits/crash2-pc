@@ -6,6 +6,7 @@
 #include "host.h"
 #include "host_log.h"
 #include "menus.h"
+#include "render.h"
 #include "settings.h"
 #include "video.h"
 
@@ -58,8 +59,9 @@ enum {
 #define TITLE_ANIMATION_WORD 330
 #define TITLE_OPTIONS_ITEM 2
 #define TITLE_ITEM_COUNT 3
-/* The rows from half a line above NEW GAME's, clear of the logo */
+/* The rows from half a line above NEW GAME's, clear of the logo, as many as fit below it */
 #define TITLE_FIRST_ROW_Y (LINE / 2)
+#define TITLE_VISIBLE_ROWS 4
 
 /* DispC's code as the warp rooms and levels load it (the title's, its pause menu unused, has it 94 words further on):
  * DONE's text set (MOVE r57 <- DONE), the choice's branch (BRANCH_IF r41), the CTR row's sides tested (EQUAL r63,
@@ -78,8 +80,9 @@ enum {
 /* DONE's text, string 50 of the menus' animation; the status bit with which the menu leaves its rows' refresh */
 #define DONE_FRAME (50 * ITEM)
 #define REFRESH_STATUS 0x20
-/* The rows laid out as the pause options' own: item 2 at the menu's height */
+/* The rows laid out as the pause options' own (item 2 at the menu's height), as many as the panel holds */
 #define PAUSE_MIDDLE_ROW 2
+#define PAUSE_VISIBLE_ROWS 5
 
 /* DispC's text object (SPAWN_FORCED, subtype 19, 6 arguments: item, animation, frame, 0, height, 0), the event a
  * menu's texts end on, the title's tests of left and right pressed */
@@ -95,8 +98,7 @@ enum {
 /* A row's value between the font's arrows, as the pause menu's MONO and STEREO */
 #define VALUE_FORMAT "~sx800~<~sx400~%s~sx800~>"
 #define ANIMATION_WORDS ((ANIMATION_HEADER_BYTES + TEXT_BYTES) / WORD_BYTES)
-#define ROW_COUNT (SETTING_COUNT + 1)
-#define DONE_ROW SETTING_COUNT
+#define ROWS_MAX (SETTING_COUNT + 1)
 /* Room for an event's arguments, none here (the game's events take up to 7) */
 #define EVENT_ARGUMENTS 8
 
@@ -147,11 +149,16 @@ typedef struct {
 
 static TextAnimation s_TitleOptions;
 static TextAnimation s_PauseOptions;
-static TextAnimation s_Rows[ROW_COUNT];
+static TextAnimation s_Rows[ROWS_MAX];
+/* The settings the rows show, those this run has a use for, then DONE */
+static int s_RowSettings[ROWS_MAX];
+static int s_RowCount;
 
 /* The menu the options screen is open in (NULL when closed), its kind (TITLE_ITEMS or PAUSE_ITEM) */
 static void *s_Menu;
 static int s_MenuKind;
+/* The first of the rows shown */
+static int s_FirstRow;
 /* PC OPTIONS's item in the pause options, and whether their next start (from the options screen) puts the cursor
  * back on it */
 static int32_t s_PauseItem = -1;
@@ -204,44 +211,105 @@ static int animation_word(void) {
     return s_MenuKind == TITLE_ITEMS ? TITLE_ANIMATION_WORD : PAUSE_ANIMATION_WORD;
 }
 
+static int done_row(void) {
+    return s_RowCount - 1;
+}
+
+/* Whether the options show a setting: the resolution only with the GPU renderer to draw at it */
+static int shown(int setting) {
+    switch (setting) {
+    case SETTING_RESOLUTION:
+        return Render_Active();
+    default:
+        return 1;
+    }
+}
+
 static void write_row(void *object, int row) {
     char text[TEXT_BYTES];
 
-    if (row == DONE_ROW) {
+    if (row == done_row()) {
         snprintf(text, sizeof(text), "DONE");
     } else {
-        const Setting *setting = &g_Settings[row];
+        const Setting *setting = &g_Settings[s_RowSettings[row]];
 
         snprintf(text, sizeof(text), VALUE_FORMAT, setting->values[setting->value]);
     }
     write_text(&s_Rows[row], object, animation_word(), text);
 }
 
-static int32_t row_height(int row) {
+/* A shown row's height by its place among the shown */
+static int32_t row_height(int slot) {
     if (s_MenuKind == TITLE_ITEMS) {
-        return TITLE_FIRST_ROW_Y - row * LINE;
+        return TITLE_FIRST_ROW_Y - slot * LINE;
     } else {
-        return (row - PAUSE_MIDDLE_ROW) * -LINE;
+        return (slot - PAUSE_MIDDLE_ROW) * -LINE;
+    }
+}
+
+static int visible_rows(void) {
+    if (s_MenuKind == TITLE_ITEMS) {
+        return TITLE_VISIBLE_ROWS;
+    } else {
+        return PAUSE_VISIBLE_ROWS;
+    }
+}
+
+/* The rows from the first shown, as many as the menu has room for: each a text of its own item, which the cursor
+ * lights as it does the menu's */
+static void show_rows(void *object) {
+    int slot;
+
+    end_texts(object);
+    for (slot = 0; slot < visible_rows() && s_FirstRow + slot < s_RowCount; slot++) {
+        int row = s_FirstRow + slot;
+
+        spawn_text(object, row * ITEM, &s_Rows[row], 0, row_height(slot));
+    }
+}
+
+/* The rows shown moved to keep the cursor's in view */
+static void follow_cursor(void *object) {
+    int row = GOOL_REGISTER(object, CURSOR) / ITEM;
+
+    if (row < s_FirstRow) {
+        s_FirstRow = row;
+        show_rows(object);
+    } else if (row >= s_FirstRow + visible_rows()) {
+        s_FirstRow = row - visible_rows() + 1;
+        show_rows(object);
+    } else {
+        /* In view */
     }
 }
 
 static void open_options(void *object, int kind) {
+    int setting;
     int row;
 
     s_Menu = object;
     s_MenuKind = kind;
-    end_texts(object);
-    for (row = 0; row < ROW_COUNT; row++) {
-        write_row(object, row);
-        spawn_text(object, row * ITEM, &s_Rows[row], 0, row_height(row));
+    s_FirstRow = 0;
+    s_RowCount = 0;
+    for (setting = 0; setting < SETTING_COUNT; setting++) {
+        if (shown(setting)) {
+            s_RowSettings[s_RowCount++] = setting;
+        } else {
+            continue;
+        }
     }
+    s_RowCount++;
+    for (row = 0; row < s_RowCount; row++) {
+        write_row(object, row);
+    }
+    show_rows(object);
     GOOL_REGISTER(object, CURSOR) = 0;
-    GOOL_REGISTER(object, ITEM_COUNT) = ROW_COUNT * ITEM;
+    GOOL_REGISTER(object, ITEM_COUNT) = s_RowCount * ITEM;
 }
 
 /* A setting's value moved by step (1 or -1), round its values, and shown */
 static void change(void *object, int row, int step) {
-    Setting *setting = &g_Settings[row];
+    Setting *setting = &g_Settings[s_RowSettings[row]];
 
     setting->value = (setting->value + step + setting->count) % setting->count;
     write_row(object, row);
@@ -253,7 +321,7 @@ static void change(void *object, int row, int step) {
 static void sides(void *object) {
     int row = GOOL_REGISTER(object, CURSOR) / ITEM;
 
-    if (row < 0 || row >= SETTING_COUNT) {
+    if (row < 0 || row >= done_row()) {
         return;
     } else if (Gool_OpTestPad(LEFT_PRESSED, 0)) {
         change(object, row, -1);
@@ -300,9 +368,9 @@ static void close_options(void *object) {
 static void choose(void *object) {
     int row = GOOL_REGISTER(object, CURSOR) / ITEM;
 
-    if (row == DONE_ROW) {
+    if (row == done_row()) {
         close_options(object);
-    } else if (row >= 0 && row < SETTING_COUNT) {
+    } else if (row >= 0 && row < done_row()) {
         change(object, row, 1);
     } else {
         /* Off the rows: nothing to choose */
@@ -339,6 +407,7 @@ static void title_sides(void *object) {
     if (s_Menu == object) {
         /* The title's wait for the attract demo held off while the screen is open */
         GOOL_WORD(object, OBJECT_STATE_TIME) = GOOL_WORD(object, OBJECT_FRAME_TIME);
+        follow_cursor(object);
         sides(object);
     } else {
         /* The menu's own */
@@ -389,6 +458,7 @@ static void pause_choice(void *object) {
 
 static void pause_sides(void *object) {
     if (s_Menu == object) {
+        follow_cursor(object);
         sides(object);
         push(object, 0);
     } else {

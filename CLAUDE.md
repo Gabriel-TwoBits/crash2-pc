@@ -48,6 +48,12 @@ is shows it by the same `game_frames.txt` hashes as before.
   `tools/run_game.py DISC.cue --schedule memory-card --against retail` saves on an empty card
   (`build/run_game/retail/memcard1.mcd`); the port with that schedule's presses and `CRASH2_MEMORY_CARD=FILE` on a new
   file (3,500 game frames) saves its own, to compare frame by frame.
+- The GPU renderer headless: `CRASH2_HEADLESS_GPU=1` beside `CRASH2_HEADLESS=1` draws on SDL's offscreen driver,
+  `CRASH2_SETTINGS=FILE` names a settings file (`resolution=3` is 4×; headless reads none otherwise), and each
+  `CRASH2_GAME_CLOCK_SHOTS` frame also writes `DIR/shot_N_gpu.ppm` at the resolution. `VK_ICD_FILENAMES` picks the
+  driver: `/usr/share/vulkan/icd.d/lvp_icd.json` (lavapipe, in software) or `radeon_icd.json`. The game's frames, sound
+  and card stay those of the software run: the renderer only draws. `tools/linux/run.sh --gpu --window` runs the
+  AppImage's window on lavapipe in the container.
 - The game's objects: `CRASH2_GAME_CLOCK_OBJECTS=N,M` lists the live objects at those game frames in
   `DIR/objects_N.txt` (GOOL entry, subtype, state, the code word the pc is at), to find the object a change concerns.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header

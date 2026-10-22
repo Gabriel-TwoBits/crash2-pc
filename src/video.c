@@ -7,14 +7,20 @@
 #include "host_log.h"
 #include "input.h"
 #include "psyq/host_psyq.h"
+#include "render.h"
 #include "settings.h"
 #include "video.h"
 
 /* The display: VRAM's displayed rectangle (PutDispEnv) in an SDL3 window at 4:3, one picture a vertical blank, paced
- * to the NTSC frame rate. CRASH2_HEADLESS runs without a window or pacing; CRASH2_DUMP=DIR writes the display every
- * CRASH2_DUMP_EVERY blanks (60 by default) as DIR/blank_N.ppm, all of VRAM with CRASH2_DUMP_VRAM set */
+ * to the NTSC frame rate: the GPU renderer's (render.c), or with no GPU device for it an SDL_Renderer's of the
+ * software picture. CRASH2_HEADLESS runs without a window or pacing, and with CRASH2_HEADLESS_GPU set the GPU
+ * renderer still draws (a test's); CRASH2_DUMP=DIR writes the display every CRASH2_DUMP_EVERY blanks (60 by default)
+ * as DIR/blank_N.ppm, all of VRAM with CRASH2_DUMP_VRAM set */
 
 #define HEADLESS_VARIABLE "CRASH2_HEADLESS"
+#define HEADLESS_GPU_VARIABLE "CRASH2_HEADLESS_GPU"
+/* SDL's video driver with no display, whose Vulkan the GPU renderer takes headless */
+#define OFFSCREEN_DRIVER "offscreen"
 #define DUMP_VARIABLE "CRASH2_DUMP"
 #define DUMP_EVERY_VARIABLE "CRASH2_DUMP_EVERY"
 #define DUMP_EVERY_DEFAULT 60
@@ -70,13 +76,24 @@ static void start(void) {
         /* The default interval */
     }
     if (s_Headless) {
+        if (getenv(HEADLESS_GPU_VARIABLE) != NULL && SDL_SetHint(SDL_HINT_VIDEO_DRIVER, OFFSCREEN_DRIVER) &&
+            SDL_Init(SDL_INIT_VIDEO)) {
+            Render_Start(NULL);
+        } else {
+            /* No picture drawn */
+        }
         return;
     } else if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD)) {
         Host_Log("no window (%s): running headless", SDL_GetError());
         s_Headless = 1;
-    } else if (!SDL_CreateWindowAndRenderer("Crash Bandicoot 2", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE,
-                                            &s_Window, &s_Renderer)) {
+    } else if ((s_Window = SDL_CreateWindow("Crash Bandicoot 2", WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_RESIZABLE)) ==
+               NULL) {
         Host_Log("no window (%s): running headless", SDL_GetError());
+        s_Headless = 1;
+    } else if (!Render_Start(s_Window) && (s_Renderer = SDL_CreateRenderer(s_Window, NULL)) == NULL) {
+        Host_Log("no renderer (%s): running headless", SDL_GetError());
+        SDL_DestroyWindow(s_Window);
+        s_Window = NULL;
         s_Headless = 1;
     } else {
         Host_ApplySettings();
@@ -93,14 +110,20 @@ static SDL_ScaleMode scale_mode(void) {
 void Host_ApplySettings(void) {
     SDL_RendererLogicalPresentation shape = SDL_LOGICAL_PRESENTATION_LETTERBOX;
 
+    Render_ApplySettings();
     if (s_Window == NULL) {
+        return;
+    } else {
+        SDL_SetWindowFullscreen(s_Window, g_Settings[SETTING_FULLSCREEN].value != 0);
+    }
+    if (s_Renderer == NULL) {
+        /* The GPU renderer's window, which it presents to as the settings have it */
         return;
     } else if (g_Settings[SETTING_STRETCH].value) {
         shape = SDL_LOGICAL_PRESENTATION_STRETCH;
     } else {
         /* 4:3, letterboxed */
     }
-    SDL_SetWindowFullscreen(s_Window, g_Settings[SETTING_FULLSCREEN].value != 0);
     SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, shape);
     if (s_Texture != NULL) {
         SDL_SetTextureScaleMode(s_Texture, scale_mode());
@@ -149,9 +172,8 @@ static void dump(int width, int height) {
     fclose(file);
 }
 
-static void show(int width, int height) {
+static void poll_events(void) {
     SDL_Event event;
-    Uint64 now;
 
     while (SDL_PollEvent(&event)) {
         if (event.type == SDL_EVENT_QUIT) {
@@ -160,6 +182,10 @@ static void show(int width, int height) {
             Host_InputEvent(&event);
         }
     }
+}
+
+/* The software picture through the SDL_Renderer */
+static void show(int width, int height) {
     if (s_Texture == NULL || s_Texture->w != width || s_Texture->h != height) {
         if (s_Texture != NULL) {
             SDL_DestroyTexture(s_Texture);
@@ -176,6 +202,11 @@ static void show(int width, int height) {
     SDL_RenderClear(s_Renderer);
     SDL_RenderTexture(s_Renderer, s_Texture, NULL, NULL);
     SDL_RenderPresent(s_Renderer);
+}
+
+static void pace(void) {
+    Uint64 now;
+
     s_NextFrame += FRAME_NS;
     now = SDL_GetTicksNS();
     if (now < s_NextFrame) {
@@ -212,9 +243,17 @@ void Host_PresentFrame(void) {
     } else {
         /* Not a dumped blank */
     }
-    if (!s_Headless) {
+    if (Render_Active()) {
+        Render_Present(x, y, width, height, enabled, s_Pixels);
+    } else if (!s_Headless) {
         show(width, height);
     } else {
-        /* No window */
+        /* No picture */
+    }
+    if (!s_Headless) {
+        poll_events();
+        pace();
+    } else {
+        /* Unpaced */
     }
 }

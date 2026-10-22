@@ -7,6 +7,7 @@ enum {
     SETTING_FULLSCREEN,
     SETTING_STRETCH,
     SETTING_SMOOTH,
+    SETTING_RESOLUTION,
     SETTING_COUNT
 };
 
@@ -20,6 +21,8 @@ typedef struct {
 
 extern Setting g_Settings[SETTING_COUNT];
 
+/* The resolution's multiple of the PlayStation's, 1 its own (the software picture) */
+int Host_ResolutionScale(void);
 void Host_LoadSettings(void);
 void Host_SaveSettings(void);
 

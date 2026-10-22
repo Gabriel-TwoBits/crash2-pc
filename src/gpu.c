@@ -1,10 +1,12 @@
 #include "gpu.h"
 #include "gpu_raster.h"
 #include "host_log.h"
+#include "render.h"
 
 /* The GPU's GP0 commands (psx-spx's "GPU Render Polygon Commands" to "GPU Display Control Commands"): this file reads
  * them and keeps the drawing state (E1 to E6), and SwanStation's rasterizer draws (gpu_raster.cpp), each primitive
- * handed over as SwanStation's own front end does (its GPU_SW::DispatchRenderCommand) */
+ * handed over as SwanStation's own front end does (its GPU_SW::DispatchRenderCommand); the GPU renderer
+ * (render.c) draws each again at its resolution */
 
 uint16_t g_Vram[VRAM_HEIGHT][VRAM_WIDTH];
 
@@ -183,6 +185,7 @@ static void polygon(const uint32_t *words) {
     }
     if (drawing_area_valid()) {
         Raster_Polygon(&state, vertices, corners);
+        Render_Polygon(&state, vertices, corners);
     } else {
         /* Nothing is drawn outside a valid area */
     }
@@ -206,6 +209,7 @@ static void single_line(const uint32_t *words) {
     }
     if (drawing_area_valid()) {
         Raster_Line(&state, LINE_ENDS, ends);
+        Render_Line(&state, LINE_ENDS, ends);
     } else {
         /* Nothing is drawn outside a valid area */
     }
@@ -248,6 +252,8 @@ static void rect(const uint32_t *words) {
     } else {
         Raster_Rectangle(&state, sign_extend((uint32_t)corner.x, COORDINATE_BITS),
                          sign_extend((uint32_t)corner.y, COORDINATE_BITS), width, height, texcoord);
+        Render_Rectangle(&state, sign_extend((uint32_t)corner.x, COORDINATE_BITS),
+                         sign_extend((uint32_t)corner.y, COORDINATE_BITS), width, height, texcoord);
     }
 }
 
@@ -259,6 +265,7 @@ static void fill(const uint32_t *words) {
 
     if (width > 0 && height > 0) {
         Raster_Fill(x, y, width, height, words[0] & COLOUR_MASK);
+        Render_Fill(x, y, width, height, words[0] & COLOUR_MASK);
     } else {
         /* An empty fill */
     }
@@ -277,6 +284,8 @@ void Gpu_MoveImage(int x, int y, int width, int height, int to_x, int to_y) {
     if (width > 0 && height > 0) {
         Raster_Copy((uint32_t)x & VRAM_X_MASK, (uint32_t)y & VRAM_Y_MASK, (uint32_t)to_x & VRAM_X_MASK,
                     (uint32_t)to_y & VRAM_Y_MASK, (uint32_t)width, (uint32_t)height, s_State.mask);
+        Render_Copy((uint32_t)x & VRAM_X_MASK, (uint32_t)y & VRAM_Y_MASK, (uint32_t)to_x & VRAM_X_MASK,
+                    (uint32_t)to_y & VRAM_Y_MASK, (uint32_t)width, (uint32_t)height);
     } else {
         /* An empty copy */
     }
@@ -287,6 +296,7 @@ void Gpu_LoadImage(int x, int y, int width, int height, const uint16_t *pixels) 
     if (width > 0 && height > 0) {
         Raster_Load((uint32_t)x & VRAM_X_MASK, (uint32_t)y & VRAM_Y_MASK, (uint32_t)width, (uint32_t)height, pixels,
                     s_State.mask);
+        Render_Load((uint32_t)x & VRAM_X_MASK, (uint32_t)y & VRAM_Y_MASK, (uint32_t)width, (uint32_t)height);
     } else {
         /* An empty transfer */
     }
@@ -305,6 +315,8 @@ void Gpu_StoreImage(int x, int y, int width, int height, uint16_t *pixels) {
 static void set_drawing_area(void) {
     if (drawing_area_valid()) {
         Raster_SetDrawingArea((uint32_t)s_State.area_left, (uint32_t)s_State.area_top, (uint32_t)s_State.area_right,
+                              (uint32_t)s_State.area_bottom);
+        Render_SetDrawingArea((uint32_t)s_State.area_left, (uint32_t)s_State.area_top, (uint32_t)s_State.area_right,
                               (uint32_t)s_State.area_bottom);
     } else {
         /* An invalid area draws nothing (drawing_area_valid) */
@@ -374,6 +386,9 @@ static void execute(const uint32_t *words) {
         Raster_Copy(words[1] & VRAM_X_MASK, (words[1] >> HALF_SHIFT) & VRAM_Y_MASK, words[2] & VRAM_X_MASK,
                     (words[2] >> HALF_SHIFT) & VRAM_Y_MASK, span(words[3], VRAM_X_MASK, WHOLE_WIDTH),
                     span(words[3] >> HALF_SHIFT, VRAM_Y_MASK, WHOLE_HEIGHT), s_State.mask);
+        Render_Copy(words[1] & VRAM_X_MASK, (words[1] >> HALF_SHIFT) & VRAM_Y_MASK, words[2] & VRAM_X_MASK,
+                    (words[2] >> HALF_SHIFT) & VRAM_Y_MASK, span(words[3], VRAM_X_MASK, WHOLE_WIDTH),
+                    span(words[3] >> HALF_SHIFT, VRAM_Y_MASK, WHOLE_HEIGHT));
     } else if (command >= CMD_LOAD && command < CMD_STORE) {
         s_LoadX = (int)(words[1] & VRAM_X_MASK);
         s_LoadY = (int)((words[1] >> HALF_SHIFT) & VRAM_Y_MASK);
@@ -396,6 +411,7 @@ static void load_pixel(uint16_t pixel) {
     if (s_LoadPixel == s_LoadPixels) {
         Raster_Load((uint32_t)s_LoadX, (uint32_t)s_LoadY, (uint32_t)s_LoadWidth, (uint32_t)s_LoadHeight, s_LoadBuffer,
                     s_State.mask);
+        Render_Load((uint32_t)s_LoadX, (uint32_t)s_LoadY, (uint32_t)s_LoadWidth, (uint32_t)s_LoadHeight);
     } else {
         /* More pixels to come */
     }
@@ -417,6 +433,7 @@ static void polyline_word(uint32_t word) {
         state = draw_state(s_Words[0]);
         if (drawing_area_valid()) {
             Raster_Line(&state, s_PolylineVertices, s_Polyline);
+            Render_Line(&state, s_PolylineVertices, s_Polyline);
         } else {
             /* Nothing is drawn outside a valid area */
         }

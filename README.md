@@ -27,13 +27,14 @@ effects are the PlayStation's own.
 
 ## Building
 
-On Debian or Ubuntu, with GCC's 32-bit support, CMake, Ninja, Python 3, and the 32-bit libraries SDL3 loads for a
-Wayland window (the i386 architecture enabled):
+On Debian or Ubuntu, with GCC's 32-bit support, CMake, Ninja, Python 3, glslang (the GPU renderer's shaders), and the
+32-bit libraries SDL3 loads for a Wayland window and Vulkan (the i386 architecture enabled):
 
 ```sh
 sudo dpkg --add-architecture i386 && sudo apt update
-sudo apt install gcc-multilib g++-multilib cmake ninja-build python3-venv \
-    libwayland-client0:i386 libwayland-egl1:i386 libwayland-cursor0:i386 libxkbcommon0:i386 libegl1:i386
+sudo apt install gcc-multilib g++-multilib cmake ninja-build python3-venv glslang-tools \
+    libwayland-client0:i386 libwayland-egl1:i386 libwayland-cursor0:i386 libxkbcommon0:i386 libegl1:i386 \
+    libvulkan1:i386 mesa-vulkan-drivers:i386
 git clone --recursive https://github.com/Gabriel-TwoBits/crash2-pc.git
 cd crash2-pc/decomp
 # The decompilation's split of your executable: its splitter, then your disc image
@@ -91,7 +92,12 @@ too.
 
 The port's options are in the game's menus: OPTIONS on the title screen, and PC OPTIONS in the pause menu's OPTIONS
 (Start, then OPTIONS). Up and down choose a row, ✕, left or right change it, DONE goes back: the window or full
-screen, the picture at 4:3 or stretched, sharp or smooth. They are kept in `settings.ini` beside the memory card.
+screen, the picture at 4:3 or stretched, sharp or smooth, and the resolution (the PlayStation's, or 2 to 8 times it,
+in true colour). They are kept in `settings.ini` beside the memory card.
+
+The resolution takes Vulkan from a 32-bit driver: on Linux the i386 Vulkan packages (`libvulkan1:i386` and
+`mesa-vulkan-drivers:i386` on Debian, what Steam installs too); on Windows the graphics card's driver. Without it the
+game shows the PlayStation's picture, and the options leave the resolution out.
 
 The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
 `%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.
