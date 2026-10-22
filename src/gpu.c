@@ -311,20 +311,6 @@ static void set_drawing_area(void) {
     }
 }
 
-void Gpu_SetDrawArea(int left, int top, int right, int bottom) {
-    start();
-    s_State.area_left = left;
-    s_State.area_top = top;
-    s_State.area_right = right;
-    s_State.area_bottom = bottom;
-    set_drawing_area();
-}
-
-void Gpu_SetDrawOffset(int x, int y) {
-    s_State.offset_x = x;
-    s_State.offset_y = y;
-}
-
 /* The words a command takes, or 0 for a polyline (ended by its terminator) */
 static int command_words(uint32_t command) {
     if (command >= CMD_POLYGON && command < CMD_LINE) {

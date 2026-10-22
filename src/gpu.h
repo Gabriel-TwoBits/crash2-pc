@@ -17,8 +17,5 @@ void Gpu_Write(uint32_t word);
 void Gpu_LoadImage(int x, int y, int width, int height, const uint16_t *pixels);
 void Gpu_StoreImage(int x, int y, int width, int height, uint16_t *pixels);
 void Gpu_MoveImage(int x, int y, int width, int height, int to_x, int to_y);
-/* The drawing environment's state as libgpu sets it: the drawing area (inclusive), the offset */
-void Gpu_SetDrawArea(int left, int top, int right, int bottom);
-void Gpu_SetDrawOffset(int x, int y);
 
 #endif /* GPU_H */

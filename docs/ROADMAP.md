@@ -114,7 +114,30 @@ matching"):
      the PlayStation shows it (decomp's `tools/run_game.py`, `title_again`), then the attract demo's river level with
      its "DEMO" and timer, and back to the title. Headless with the rasterizer, about 180 vertical blanks a second; a
      change to the GPU's code that names its constants leaves the frame at blank 3,000 the same to the byte.
-   - **Left:** a frame-by-frame comparison with the PlayStation build on the game clock, the levels' pictures, speed.
+   - **Game clock:** `CRASH2_GAME_CLOCK=DIR` keeps decomp's `tools/run_game.lua` clock through decomp's
+     `FRAME_ENDING()` on entering `Gfx_EndFrame`: the root counter's interrupts kept from the game, `g_TimerTicks` set
+     to the game frame times 34. `DIR/game_frames.txt` takes its lines (game frame, vertical blank, a 64-bit FNV-1a
+     over the displayed 16-bit pixels as 32-bit words): frame 0's, black, is the emulator's `3fd4ebc4ab9ce325`.
+     `CRASH2_GAME_CLOCK_SHOTS` and `CRASH2_GAME_CLOCK_DUMPS` write a frame's picture and the game's data and bss at
+     their retail addresses, as `run_game.py --dump`.
+   - **Against the emulator, the pictures:** on the demo's 4,801 game frames the hashes agree only where the screen is
+     black. The pictures can't agree to the pixel: PCSX-Redux draws with its own rasterizer. At game frame 2,800 both
+     show the title's logo at the same point of its animation, 85.5% of the pixels the same; the nebula behind it and
+     the stars sit elsewhere.
+   - **Against the emulator, the state:** `tools/compare_ram.py` compares the game's variables (those its C names) in
+     decomp's `run_game.py --dump` and the port's dumps, a word holding the same place on both sides apart: a pointer
+     or a 24-bit link moved by the port's data, heap or scratchpad offset, or a pointer into code. On the demo:
+     - game frame 3: 7 of 11,944 words differ, the sound's state (`D_8005FCF8`, the libraries' stubs) and
+       `D_8006CCB8`, which `Sys_MainLoop` sets to what `Gfx_DrawWorlds` leaves in `$v0` and nothing reads;
+     - game frame 50: 37 words, the sound's and the paging's: the PS1 has a page in flight (`D_80067FB0`,
+       `D_80067FB4`) and its page slots at another stage, its CD taking time where the port's takes none;
+     - game frame 1,000: 107 words, the same and what follows from them.
+     So the port plays the PS1's game but for the sound and the CD's timing.
+   - **Fidelity found by it:** `PutDrawEnv` builds its packet (E3, E4, E5, E1, E2, E6) in the structure's `dr_env`,
+     where the PS1's RAM holds it, and sends it; the heap sits at the retail heap's place modulo 64 KB and the
+     scratchpad at a 1 KB boundary, so the game's alignments of their addresses come out the same (`Gfx_OpenVideo`'s
+     buffer padding, 4 bytes apart before).
+   - **Left:** the CD's timing, for whole runs to stay together; speed.
 7. **Input, sound, saves (in progress).**
    - **Input (done):** `src/input.c` reads the keyboard and the first gamepad through SDL3, and `src/psyq/pad.c`
      writes them into the pad's buffer at each vertical blank: a digital pad's buttons, 0 while pressed, in psx-spx's

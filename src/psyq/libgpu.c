@@ -45,7 +45,15 @@ typedef struct {
 #define DRAW_MODE_COMMAND 0xE1000000u
 #define TEXTURE_WINDOW_COMMAND 0xE2000000u
 #define FILL_COMMAND 0x02000000u
-#define FILL_WORDS 3
+#define AREA_TOP_LEFT_COMMAND 0xE3000000u
+#define AREA_BOTTOM_RIGHT_COMMAND 0xE4000000u
+#define OFFSET_COMMAND 0xE5000000u
+#define MASK_COMMAND 0xE6000000u
+/* E3, E4: x and y in 10 bits each; E5: in 11 */
+#define AREA_FIELD_MASK 0x3FF
+#define AREA_Y_SHIFT 10
+#define OFFSET_FIELD_MASK 0x7FF
+#define OFFSET_Y_SHIFT 11
 #define DRAW_MODE_DITHER 0x200
 #define DRAW_MODE_DISPLAY 0x400
 #define DRAW_MODE_PAGE_MASK 0x9FF
@@ -133,23 +141,36 @@ static uint32_t texture_window(const Rect *window) {
            (offset_y << WINDOW_OFFSET_Y_SHIFT);
 }
 
-DrawEnv *PutDrawEnv(DrawEnv *env) {
-    uint32_t words[FILL_WORDS];
+int DrawPrim(uint32_t *primitive);
 
-    Gpu_SetDrawArea(env->clip.x, env->clip.y, env->clip.x + env->clip.w - 1, env->clip.y + env->clip.h - 1);
-    Gpu_SetDrawOffset(env->ofs[0], env->ofs[1]);
-    Gpu_Write(DRAW_MODE_COMMAND | (env->tpage & DRAW_MODE_PAGE_MASK) | (env->dtd ? DRAW_MODE_DITHER : 0) |
-              (env->dfe ? DRAW_MODE_DISPLAY : 0));
-    Gpu_Write(texture_window(&env->tw));
+/* The environment's packet, which libgpu builds in the structure's dr_env (the PlayStation's RAM holds it there,
+ * decomp's tools/run_game.py --dump) and sends: the drawing area's corners, the offset, the draw mode, the texture
+ * window, the mask, then the background's fill */
+DrawEnv *PutDrawEnv(DrawEnv *env) {
+    uint32_t *packet = env->dr_env;
+    int words = 0;
+
+    packet[++words] = AREA_TOP_LEFT_COMMAND | ((uint32_t)env->clip.x & AREA_FIELD_MASK) |
+                      (((uint32_t)env->clip.y & AREA_FIELD_MASK) << AREA_Y_SHIFT);
+    packet[++words] = AREA_BOTTOM_RIGHT_COMMAND | ((uint32_t)(env->clip.x + env->clip.w - 1) & AREA_FIELD_MASK) |
+                      (((uint32_t)(env->clip.y + env->clip.h - 1) & AREA_FIELD_MASK) << AREA_Y_SHIFT);
+    packet[++words] = OFFSET_COMMAND | ((uint32_t)env->ofs[0] & OFFSET_FIELD_MASK) |
+                      (((uint32_t)env->ofs[1] & OFFSET_FIELD_MASK) << OFFSET_Y_SHIFT);
+    packet[++words] = DRAW_MODE_COMMAND | (env->tpage & DRAW_MODE_PAGE_MASK) | (env->dtd ? DRAW_MODE_DITHER : 0) |
+                      (env->dfe ? DRAW_MODE_DISPLAY : 0);
+    packet[++words] = texture_window(&env->tw);
+    packet[++words] = MASK_COMMAND;
     if (env->isbg) {
-        words[0] = FILL_COMMAND | env->r0 | ((uint32_t)env->g0 << COLOUR_GREEN_SHIFT) |
-                   ((uint32_t)env->b0 << COLOUR_BLUE_SHIFT);
-        words[1] = ((uint32_t)env->clip.x & FILL_X_MASK) | ((uint32_t)env->clip.y << HALF_SHIFT);
-        words[2] = (((uint32_t)env->clip.w + FILL_WIDTH_ROUND) & HALF_MASK) | ((uint32_t)env->clip.h << HALF_SHIFT);
-        send_words(words, FILL_WORDS);
+        packet[++words] = FILL_COMMAND | env->r0 | ((uint32_t)env->g0 << COLOUR_GREEN_SHIFT) |
+                          ((uint32_t)env->b0 << COLOUR_BLUE_SHIFT);
+        packet[++words] = ((uint32_t)env->clip.x & FILL_X_MASK) | ((uint32_t)env->clip.y << HALF_SHIFT);
+        packet[++words] =
+            (((uint32_t)env->clip.w + FILL_WIDTH_ROUND) & HALF_MASK) | ((uint32_t)env->clip.h << HALF_SHIFT);
     } else {
         /* No background fill */
     }
+    packet[0] = ((uint32_t)words << TAG_LENGTH_SHIFT) | TAG_END;
+    DrawPrim(packet);
     return env;
 }
 

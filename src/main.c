@@ -18,7 +18,12 @@
 #define HEAP_START_OFFSET 4
 #define HEAP_SLACK_BYTES 8
 #define SCRATCHPAD_BYTES 0x400
-#define WORD_ALIGNMENT 4
+/* The heap at the retail heap's place modulo 64 KB (libsn's start-up puts its base at the image's end, 0x8006F1F0),
+ * and the scratchpad aligned to its size as at 0x1F800000: the game's alignments of their addresses come out as on
+ * the PlayStation (a buffer's padding in Gfx_OpenVideo, D_80069340) */
+#define HEAP_ALIGNMENT 0x10000
+#define RETAIL_HEAP_BASE 0x8006F1F0u
+#define HEAP_PLACE (RETAIL_HEAP_BASE & (HEAP_ALIGNMENT - 1))
 
 /* The heap's base and size, the start-up's words libsn's InitHeap reads */
 extern unsigned char *D_8005CB28;
@@ -29,8 +34,9 @@ int Game_Main(void);
 /* GNU ld's: the program's first address */
 extern char __executable_start[];
 
-unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
-static unsigned char s_Heap[HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
+unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(SCRATCHPAD_BYTES)));
+static unsigned char s_HeapArea[HEAP_PLACE + HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(HEAP_ALIGNMENT)));
+unsigned char *const g_HostHeap = s_HeapArea + HEAP_PLACE;
 
 /* The linker's window reservation past the program (cmake/game_data.ld) */
 extern char __window_rest_start[];
@@ -67,8 +73,8 @@ int main(int argc, char **argv) {
     } else {
         Host_OpenDisc(disc);
     }
-    D_8005CB28 = s_Heap;
+    D_8005CB28 = g_HostHeap;
     D_8005CB2C = HEAP_BYTES;
-    func_8001144C((int *)(s_Heap + HEAP_START_OFFSET), HEAP_BYTES);
+    func_8001144C((int *)(g_HostHeap + HEAP_START_OFFSET), HEAP_BYTES);
     return Game_Main();
 }
