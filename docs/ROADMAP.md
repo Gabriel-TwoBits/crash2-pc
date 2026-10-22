@@ -223,5 +223,12 @@ matching"):
      loader with them; SDL3 draws in software where it finds no OpenGL. In a 64-bit Debian with no 32-bit library, the
      demo's 6,000 game frames and the memory-card run give the same frames' hashes, SPU writes and card as the build's
      own runs, and in a window on Xvfb the first 600 game frames too.
+   - **For players:** started without a disc image, the program opens the one chosen last (its path in `disc.txt` in
+     SDL's preference folder) or asks for one in the system's file dialog (SDL3's: the desktop's portal on Linux, the
+     common dialog on Windows); a dialog that can't open stops the program with the reason. A fatal error shows in a
+     message box when a player can see it (not headless, not inside a fault's handler, where the box could wait on a
+     lock the fault holds). `crash2.exe` is a window's program, with no console. In the test systems: the remembered
+     image plays the same frames, a system with no portal and no zenity reports it, and under Wine the program waits on
+     its dialog with no error.
    - **Left:** Windows itself, which no machine here runs, and the AppImage on a desktop: their windows, sound and
      gamepads through SDL3.

@@ -53,8 +53,8 @@ What the split and the build make from your executable stays in `decomp/` (ignor
 
 `tools/linux/build.sh` builds the same in a container, with podman or docker, into
 `build-linux/crash2-pc-linux.AppImage`: the 32-bit program with every library it loads, its C library included, so it
-runs on a 64-bit Linux with no 32-bit library installed, X11 or Wayland, PulseAudio or PipeWire. Run it with the disc
-image: `./crash2-pc-linux.AppImage "path/to/the.cue"`.
+runs on a 64-bit Linux with no 32-bit library installed, X11 or Wayland, PulseAudio or PipeWire. Open it, or run
+`./crash2-pc-linux.AppImage "path/to/the.cue"`.
 
 ### Windows
 
@@ -66,11 +66,16 @@ tools/windows/build.sh
 ```
 
 makes `build-windows/crash2-pc-windows.zip`: `crash2.exe`, `crash2-game.dll`, `SDL3.dll` and the licences. On Windows,
-drop the disc image's `.cue` onto `crash2.exe`, or run `crash2.exe "path\to\the.cue"`. It needs 64-bit Windows: the
-game sits at 0x80000000, which only a 64-bit system gives a 32-bit program. Tried under Wine so far, where it plays
+open `crash2.exe`, or drop the disc image's `.cue` onto it. It needs 64-bit Windows: the game sits at 0x80000000,
+which only a 64-bit system gives a 32-bit program. Tried under Wine so far, where it plays
 the PlayStation's frames as the Linux build does, not on Windows itself.
 
 ## Playing
+
+You need your own disc image of the game (USA, SCUS-94154): a `.cue` with its `.bin`, or an `.iso`. Name it as the
+program's argument, or start the program without one: it asks for the image in the system's file dialog the first
+time and opens the same one after that (its path is kept in `disc.txt` beside the memory card). `CRASH2_DISC` names one
+too.
 
 | PlayStation | Keyboard | Gamepad |
 | --- | --- | --- |

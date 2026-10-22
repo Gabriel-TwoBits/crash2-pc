@@ -253,10 +253,14 @@ static LONG CALLBACK on_exception(EXCEPTION_POINTERS *pointers) {
                (uint32_t *)&context->EFlags};
 
     if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->ExceptionInformation[1] < LOW_RAM_BYTES) {
+        Host_InHandler(1);
         on_fault(&cpu, (uint32_t)record->ExceptionInformation[1]);
+        Host_InHandler(0);
         return EXCEPTION_CONTINUE_EXECUTION;
     } else if (record->ExceptionCode == EXCEPTION_SINGLE_STEP && s_Moved != NO_REGISTER) {
+        Host_InHandler(1);
         on_step(&cpu);
+        Host_InHandler(0);
         return EXCEPTION_CONTINUE_EXECUTION;
     } else {
         return EXCEPTION_CONTINUE_SEARCH;
@@ -286,7 +290,9 @@ static void on_segmentation_fault(int signal_number, siginfo_t *info, void *cont
     Cpu cpu = cpu_of(context_pointer);
 
     (void)signal_number;
+    Host_InHandler(1);
     on_fault(&cpu, (uint32_t)(uintptr_t)info->si_addr);
+    Host_InHandler(0);
 }
 
 static void on_trap(int signal_number, siginfo_t *info, void *context_pointer) {
@@ -294,7 +300,9 @@ static void on_trap(int signal_number, siginfo_t *info, void *context_pointer) {
 
     (void)signal_number;
     (void)info;
+    Host_InHandler(1);
     on_step(&cpu);
+    Host_InHandler(0);
 }
 
 void Host_InstallLowRam(void) {

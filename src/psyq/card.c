@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "host_log.h"
+#include "preferences.h"
 #include "psyq/host_psyq.h"
 
 /* The memory card in port 1, in a file: a 128 KB image of the card (the emulators' .mcd), its frames written through
@@ -16,8 +17,6 @@
 
 #define CARD_VARIABLE "CRASH2_MEMORY_CARD"
 #define CARD_FILE_NAME "memcard1.mcd"
-#define PREFERENCE_ORGANIZATION "crash2-pc"
-#define PREFERENCE_APPLICATION "crash2-pc"
 #define DEVICE "bu00:"
 #define PATH_BYTES 4096
 
@@ -178,16 +177,14 @@ static void save_frames(int first, int count) {
 static void load(void) {
     const char *named = getenv(CARD_VARIABLE);
     char path[PATH_BYTES];
-    char *folder;
 
     s_Loaded = 1;
     if (named != NULL) {
         snprintf(path, sizeof(path), "%s", named);
-    } else if ((folder = SDL_GetPrefPath(PREFERENCE_ORGANIZATION, PREFERENCE_APPLICATION)) != NULL) {
-        snprintf(path, sizeof(path), "%s%s", folder, CARD_FILE_NAME);
-        SDL_free(folder);
-    } else {
+    } else if (Host_PreferencePath(CARD_FILE_NAME, path, sizeof(path)) != 0) {
         Host_Fatal("no folder for the memory card (%s), and no %s set", SDL_GetError(), CARD_VARIABLE);
+    } else {
+        /* The preferences' card */
     }
     s_File = fopen(path, "r+b");
     if (s_File != NULL && fread(s_Card, CARD_BYTES, 1, s_File) == 1) {

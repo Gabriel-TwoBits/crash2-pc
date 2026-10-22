@@ -6,6 +6,7 @@
 #include <sys/mman.h>
 #endif
 
+#include "disc.h"
 #include "host.h"
 #include "host_log.h"
 #include "low_ram.h"
@@ -95,26 +96,17 @@ static void check_window(void) {
     }
 }
 
-/* The disc image: the first argument, else CRASH2_DISC */
-#define DISC_VARIABLE "CRASH2_DISC"
-
 #ifdef _WIN32
 /* On Windows the port is a library at 0x80000000 that crash2.exe loads and enters here (src/launcher.c) */
 __declspec(dllexport) int Host_Main(int argc, char **argv) {
 #else
 int main(int argc, char **argv) {
 #endif
-    const char *disc = argc > 1 ? argv[1] : getenv(DISC_VARIABLE);
-
     check_window();
     Host_InstallLowRam();
     Host_StartSampler();
-    if (disc == NULL) {
-        Host_Fatal("usage: crash2 DISC.cue (or DISC.iso), or " DISC_VARIABLE " set to it");
-    } else {
-        Host_OpenDisc(disc);
-        Host_SoundStart();
-    }
+    Host_OpenDisc(Host_ChooseDisc(argc, argv));
+    Host_SoundStart();
     D_8005CB28 = heap_base();
     D_8005CB2C = HEAP_BYTES;
     func_8001144C((int *)(heap_base() + HEAP_START_OFFSET), HEAP_BYTES);

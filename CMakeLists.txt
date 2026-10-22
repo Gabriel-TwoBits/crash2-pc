@@ -92,6 +92,8 @@ set_source_files_properties(${HOST_DATA} PROPERTIES GENERATED TRUE COMPILE_OPTIO
 # library loaded then can (docs/ROADMAP.md, milestone 8)
 set(PORT_SOURCES
     src/main.c
+    src/disc.c
+    src/preferences.c
     src/audio.c
     src/game_clock.c
     src/host_log.c
@@ -124,8 +126,9 @@ if(WIN32)
     set_target_properties(${PORT} PROPERTIES PREFIX "")
     add_executable(crash2 src/launcher.c)
     target_compile_options(crash2 PRIVATE -std=gnu11 -Wall -Wextra)
-    # Large-address-aware, to reach 0x80000000; Linux's 8 MB of stack for the game's thread
-    target_link_options(crash2 PRIVATE -Wl,--large-address-aware -Wl,--stack,0x800000 -static-libgcc)
+    # Large-address-aware, to reach 0x80000000; Linux's 8 MB of stack for the game's thread; a window's program, with
+    # no console of its own (an error shows in a message box)
+    target_link_options(crash2 PRIVATE -Wl,--large-address-aware -Wl,--stack,0x800000 -static-libgcc -mwindows)
     add_dependencies(crash2 ${PORT})
 else()
     set(PORT crash2)
