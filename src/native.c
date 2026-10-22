@@ -140,6 +140,7 @@ static void check_address(const Cpu *cpu, uint32_t address) {
 #define TRACED_RUNS 16
 #define TRACED_STARTS 4096
 #define TRACED_START_MASK (TRACED_STARTS - 1)
+/* Knuth's multiplicative hash: 2^32 over the golden ratio */
 #define START_HASH 2654435761u
 enum {
     TRACE_BEGIN = 0x4E494742,

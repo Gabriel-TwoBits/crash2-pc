@@ -25,6 +25,33 @@
 #define PREFIX_REPNE 0xF2
 #define PREFIX_REP 0xF3
 #define TWO_BYTE_ESCAPE 0x0F
+#define PREFIX_SEGMENT_ES 0x26
+#define PREFIX_SEGMENT_CS 0x2E
+#define PREFIX_SEGMENT_SS 0x36
+#define PREFIX_SEGMENT_DS 0x3E
+#define PREFIX_SEGMENT_FS 0x64
+#define PREFIX_SEGMENT_GS 0x65
+/* The opcodes the handler tells apart: one-byte, then after the 0x0F escape */
+#define OP_ADD_TO_REG8 0x02
+#define OP_ADD_TO_REG 0x03
+#define OP_SUB_TO_REG8 0x2A
+#define OP_SUB_TO_REG 0x2B
+#define OP_ALU_LAST 0x3F
+#define OP_ALU_FORM_MASK 7
+#define OP_ALU_TO_REG_LAST 3
+#define OP_TEST_FIRST 0x84
+#define OP_MOV_TO_REG8 0x8A
+#define OP_MOV_TO_REG 0x8B
+#define OP2_CMOV_FIRST 0x40
+#define OP2_CMOV_LAST 0x4F
+#define OP2_IMUL 0xAF
+#define OP2_MOVZX8 0xB6
+#define OP2_MOVZX16 0xB7
+#define OP2_MOVSX8 0xBE
+#define OP2_MOVSX16 0xBF
+/* The ModRM byte's place after a one-byte opcode, and after the escape and the opcode */
+#define MODRM_ONE_BYTE 1
+#define MODRM_TWO_BYTE 2
 #define MODRM_MOD(byte) ((byte) >> 6)
 #define MODRM_REG(byte) (((byte) >> 3) & 7)
 #define MODRM_RM(byte) ((byte) & 7)
@@ -57,12 +84,12 @@ static int is_prefix(unsigned char byte) {
     case PREFIX_LOCK:
     case PREFIX_REPNE:
     case PREFIX_REP:
-    case 0x26: /* segment overrides */
-    case 0x2E:
-    case 0x36:
-    case 0x3E:
-    case 0x64:
-    case 0x65:
+    case PREFIX_SEGMENT_ES:
+    case PREFIX_SEGMENT_CS:
+    case PREFIX_SEGMENT_SS:
+    case PREFIX_SEGMENT_DS:
+    case PREFIX_SEGMENT_FS:
+    case PREFIX_SEGMENT_GS:
         return 1;
     default:
         return 0;
@@ -72,27 +99,28 @@ static int is_prefix(unsigned char byte) {
 /* Whether the ModRM's reg field names a register operand (not an opcode's extension) */
 static int uses_reg_field(unsigned char opcode, int two_byte) {
     if (two_byte) {
-        return opcode == 0xB6 || opcode == 0xB7 || opcode == 0xBE || opcode == 0xBF || opcode == 0xAF ||
-               (opcode >= 0x40 && opcode <= 0x4F);
-    } else if (opcode < 0x40) {
-        return (opcode & 7) <= 3;
+        return opcode == OP2_MOVZX8 || opcode == OP2_MOVZX16 || opcode == OP2_MOVSX8 || opcode == OP2_MOVSX16 ||
+               opcode == OP2_IMUL || (opcode >= OP2_CMOV_FIRST && opcode <= OP2_CMOV_LAST);
+    } else if (opcode <= OP_ALU_LAST) {
+        return (opcode & OP_ALU_FORM_MASK) <= OP_ALU_TO_REG_LAST;
     } else {
-        return opcode >= 0x84 && opcode <= 0x8B;
+        return opcode >= OP_TEST_FIRST && opcode <= OP_MOV_TO_REG;
     }
 }
 
 /* mov, movzx and movsx from memory: the register takes the loaded value whatever it held */
 static int loads_register(unsigned char opcode, int two_byte) {
     if (two_byte) {
-        return opcode == 0xB6 || opcode == 0xB7 || opcode == 0xBE || opcode == 0xBF;
+        return opcode == OP2_MOVZX8 || opcode == OP2_MOVZX16 || opcode == OP2_MOVSX8 || opcode == OP2_MOVSX16;
     } else {
-        return opcode == 0x8A || opcode == 0x8B;
+        return opcode == OP_MOV_TO_REG8 || opcode == OP_MOV_TO_REG;
     }
 }
 
 /* add and sub into a register: one moved by s_Delta comes out moved by as much */
 static int adds_into_register(unsigned char opcode, int two_byte) {
-    return !two_byte && (opcode == 0x02 || opcode == 0x03 || opcode == 0x2A || opcode == 0x2B);
+    return !two_byte && (opcode == OP_ADD_TO_REG8 || opcode == OP_ADD_TO_REG || opcode == OP_SUB_TO_REG8 ||
+                         opcode == OP_SUB_TO_REG);
 }
 
 static void log_site(uint32_t eip, uint32_t address) {
@@ -138,12 +166,12 @@ static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) 
     } else if (*code == TWO_BYTE_ESCAPE) {
         two_byte = 1;
         opcode = code[1];
-        modrm = code[2];
-        code += 3;
+        modrm = code[MODRM_TWO_BYTE];
+        code += MODRM_TWO_BYTE + 1;
     } else {
         opcode = code[0];
-        modrm = code[1];
-        code += 2;
+        modrm = code[MODRM_ONE_BYTE];
+        code += MODRM_ONE_BYTE + 1;
     }
     if (MODRM_MOD(modrm) == MOD_REGISTER || (MODRM_MOD(modrm) == MOD_INDIRECT && MODRM_RM(modrm) == RM_DISP32)) {
         Host_Fatal("low RAM: no register in the address of 0x%08X's access to 0x%04X", (uint32_t)gregs[REG_EIP],

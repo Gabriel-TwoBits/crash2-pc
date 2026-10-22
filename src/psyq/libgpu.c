@@ -45,6 +45,7 @@ typedef struct {
 #define DRAW_MODE_COMMAND 0xE1000000u
 #define TEXTURE_WINDOW_COMMAND 0xE2000000u
 #define FILL_COMMAND 0x02000000u
+#define FILL_WORDS 3
 #define DRAW_MODE_DITHER 0x200
 #define DRAW_MODE_DISPLAY 0x400
 #define DRAW_MODE_PAGE_MASK 0x9FF
@@ -133,7 +134,7 @@ static uint32_t texture_window(const Rect *window) {
 }
 
 DrawEnv *PutDrawEnv(DrawEnv *env) {
-    uint32_t words[3];
+    uint32_t words[FILL_WORDS];
 
     Gpu_SetDrawArea(env->clip.x, env->clip.y, env->clip.x + env->clip.w - 1, env->clip.y + env->clip.h - 1);
     Gpu_SetDrawOffset(env->ofs[0], env->ofs[1]);
@@ -145,7 +146,7 @@ DrawEnv *PutDrawEnv(DrawEnv *env) {
                    ((uint32_t)env->b0 << COLOUR_BLUE_SHIFT);
         words[1] = ((uint32_t)env->clip.x & FILL_X_MASK) | ((uint32_t)env->clip.y << HALF_SHIFT);
         words[2] = (((uint32_t)env->clip.w + FILL_WIDTH_ROUND) & HALF_MASK) | ((uint32_t)env->clip.h << HALF_SHIFT);
-        send_words(words, 3);
+        send_words(words, FILL_WORDS);
     } else {
         /* No background fill */
     }

@@ -18,6 +18,8 @@
 #define SAMPLE_INTERVAL_US 1000
 #define SLOTS 4096
 #define SLOT_MASK (SLOTS - 1)
+/* Knuth's multiplicative hash: 2^32 over the golden ratio */
+#define HASH_MULTIPLIER 2654435761u
 #define SHOWN 25
 #define REPORT_LINE_BYTES 64
 
@@ -32,7 +34,7 @@ static uint32_t s_Total;
 static void on_sample(int signal_number, siginfo_t *info, void *context_pointer) {
     ucontext_t *context = context_pointer;
     uint32_t eip = (uint32_t)context->uc_mcontext.gregs[REG_EIP];
-    uint32_t index = (eip * 2654435761u) & SLOT_MASK;
+    uint32_t index = (eip * HASH_MULTIPLIER) & SLOT_MASK;
     int probes;
 
     (void)signal_number;

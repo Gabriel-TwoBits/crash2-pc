@@ -19,8 +19,9 @@
 #define PATH_BYTES 4096
 #define WINDOW_WIDTH 1280
 #define WINDOW_HEIGHT 960
-#define DISPLAY_ASPECT_WIDTH 4
-#define DISPLAY_ASPECT_HEIGHT 3
+/* The picture's 4:3, as a 640 by 480 canvas the window letterboxes */
+#define LOGICAL_WIDTH 640
+#define LOGICAL_HEIGHT 480
 #define MAX_DISPLAY_WIDTH 640
 #define MAX_DISPLAY_HEIGHT 512
 #define PIXELS_MAX (VRAM_WIDTH * VRAM_HEIGHT)
@@ -75,8 +76,7 @@ static void start(void) {
         Host_Log("no window (%s): running headless", SDL_GetError());
         s_Headless = 1;
     } else {
-        SDL_SetRenderLogicalPresentation(s_Renderer, DISPLAY_ASPECT_WIDTH * 160, DISPLAY_ASPECT_HEIGHT * 160,
-                                         SDL_LOGICAL_PRESENTATION_LETTERBOX);
+        SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
         s_NextFrame = SDL_GetTicksNS();
     }
 }

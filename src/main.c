@@ -18,6 +18,7 @@
 #define HEAP_START_OFFSET 4
 #define HEAP_SLACK_BYTES 8
 #define SCRATCHPAD_BYTES 0x400
+#define WORD_ALIGNMENT 4
 
 /* The heap's base and size, the start-up's words libsn's InitHeap reads */
 extern unsigned char *D_8005CB28;
@@ -29,8 +30,8 @@ int Game_Main(void);
 extern char __executable_start[];
 extern char _end[];
 
-unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(4)));
-static unsigned char s_Heap[HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(4)));
+unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
+static unsigned char s_Heap[HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
 
 #define PAGE_BYTES 0x1000
 
