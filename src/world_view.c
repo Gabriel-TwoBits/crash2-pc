@@ -42,7 +42,7 @@
 #define BACKWARD 0
 /* The frame buffers' primitives: the PlayStation's 0x16400 bytes a frame (twice the PAL's), the host's larger */
 #define HOST_PRIMITIVE_BYTES 0x40000
-#define HOST_FRAME_BUFFERS 3
+#define HOST_FRAME_BUFFERS 2
 
 /* The game's (decomp's include/game.h, 80026CA0.c) */
 int32_t Heap_Alloc(int32_t bytes);

@@ -40,10 +40,6 @@ Setting g_Settings[SETTING_COUNT] = {
 
 _Static_assert(VALUE_COUNT(s_Scales) == VALUE_COUNT(s_Resolutions), "a scale for each resolution named");
 
-int Host_HalfRate(void) {
-    return g_Settings[SETTING_FRAME_RATE].value == 0;
-}
-
 int Host_ResolutionScale(void) {
     return s_Scales[g_Settings[SETTING_RESOLUTION].value];
 }

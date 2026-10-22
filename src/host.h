@@ -32,9 +32,6 @@ extern unsigned int g_HostGte[];
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 
-/* An object's step through the collision, what the rounding takes carried into the next at 60 (motion.c) */
-#define OBJECT_MOVE(object, step, zone) Host_MoveObject((object), (step), (zone))
-void Host_MoveObject(void *object, int step, int zone);
 
 /* The world drawn beside the camera's view for the wide view, into larger frame buffers (world_view.c) */
 #define WORLD_SORT_LIST(list) Host_WorldSortList((unsigned short *)(list))
@@ -44,9 +41,13 @@ unsigned short *Host_WorldSortList(unsigned short *list);
 int Host_FramePrimitivesAlloc(int bytes);
 void Host_FramePrimitivesFree(int buffer);
 
-/* A game frame each two vertical blanks, or each one (settings.c) */
-#define FRAME_HALF_RATE Host_HalfRate()
-int Host_HalfRate(void);
+/* At 60 frames a second, a frame of the picture alone between two of the game's (between.c) */
+#define FRAME_BETWEEN Host_FrameBetween()
+#define FRAME_BETWEEN_SHOWN() Host_FrameBetweenShown()
+#define FRAME_ENDED() Host_FrameEnded()
+int Host_FrameBetween(void);
+void Host_FrameBetweenShown(void);
+void Host_FrameEnded(void);
 
 /* Where a game frame ends: the menus patched (menus.c), the game clock's step (game_clock.c) */
 #define FRAME_ENDING() Host_FrameEnding()

@@ -102,7 +102,7 @@ in `settings.ini` beside the memory card:
 | RES | the resolution: the PlayStation's, or 2 to 8 times it, in true colour |
 | WOBBLE | the PlayStation's polygons snapped to whole pixels, so they shake as they move; off, they glide |
 | WARPING | the PlayStation's textures stretched without depth, so they bend on a slanted surface; off, they lie flat |
-| FPS | 30 frames a second as the PlayStation's game runs, or 60 |
+| FPS | 30 frames a second as the PlayStation's game runs, or 60: a frame drawn between each two, halfway |
 
 The resolution takes Vulkan from a 32-bit driver: on Linux the i386 Vulkan packages (`libvulkan1:i386` and
 `mesa-vulkan-drivers:i386` on Debian, what Steam installs too); on Windows the graphics card's driver. Without it the

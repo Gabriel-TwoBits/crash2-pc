@@ -31,8 +31,6 @@ enum {
 
 extern Setting g_Settings[SETTING_COUNT];
 
-/* decomp's FRAME_HALF_RATE: a game frame each two vertical blanks (30 a second), unless the settings ask for 60 */
-int Host_HalfRate(void);
 /* The resolution's multiple of the PlayStation's, 1 its own (the software picture) */
 int Host_ResolutionScale(void);
 void Host_LoadSettings(void);

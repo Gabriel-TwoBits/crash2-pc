@@ -4,6 +4,7 @@
 
 #include "gpu.h"
 #include "audio.h"
+#include "between.h"
 #include "host_log.h"
 #include "input.h"
 #include "psyq/host_psyq.h"
@@ -15,7 +16,7 @@
  * to the NTSC frame rate: the GPU renderer's (render.c), or with no GPU device for it an SDL_Renderer's of the
  * software picture. CRASH2_HEADLESS runs without a window or pacing, and with CRASH2_HEADLESS_GPU set the GPU
  * renderer still draws (a test's); CRASH2_DUMP=DIR writes the display every CRASH2_DUMP_EVERY blanks (60 by default)
- * as DIR/blank_N.ppm, all of VRAM with CRASH2_DUMP_VRAM set */
+ * from blank CRASH2_DUMP_FROM (0 by default) as DIR/blank_N.ppm, all of VRAM with CRASH2_DUMP_VRAM set */
 
 #define HEADLESS_VARIABLE "CRASH2_HEADLESS"
 #define HEADLESS_GPU_VARIABLE "CRASH2_HEADLESS_GPU"
@@ -24,6 +25,7 @@
 #define DUMP_VARIABLE "CRASH2_DUMP"
 #define DUMP_EVERY_VARIABLE "CRASH2_DUMP_EVERY"
 #define DUMP_EVERY_DEFAULT 60
+#define DUMP_FROM_VARIABLE "CRASH2_DUMP_FROM"
 #define DUMP_VRAM_VARIABLE "CRASH2_DUMP_VRAM"
 #define PATH_BYTES 4096
 #define WINDOW_WIDTH 1280
@@ -53,6 +55,7 @@ static int s_Started;
 static int s_Headless;
 static const char *s_DumpDirectory;
 static int s_DumpEvery = DUMP_EVERY_DEFAULT;
+static int s_DumpFrom;
 static int s_Blanks;
 static Uint64 s_NextFrame;
 static int s_DumpVram;
@@ -61,6 +64,7 @@ static uint32_t *s_Pixels;
 
 static void start(void) {
     const char *every = getenv(DUMP_EVERY_VARIABLE);
+    const char *from = getenv(DUMP_FROM_VARIABLE);
 
     s_Started = 1;
     s_Pixels = malloc(PIXELS_MAX * sizeof(uint32_t));
@@ -76,6 +80,11 @@ static void start(void) {
         s_DumpEvery = atoi(every);
     } else {
         /* The default interval */
+    }
+    if (from != NULL && atoi(from) > 0) {
+        s_DumpFrom = atoi(from);
+    } else {
+        /* From the first blank */
     }
     if (s_Headless) {
         if (getenv(HEADLESS_GPU_VARIABLE) != NULL && SDL_SetHint(SDL_HINT_VIDEO_DRIVER, OFFSCREEN_DRIVER) &&
@@ -233,6 +242,7 @@ void Host_PresentFrame(void) {
     }
     s_Blanks++;
     Host_DisplayArea(&x, &y, &width, &height, &enabled);
+    Host_ShownArea(&x, &y);
     if (width <= 0 || height <= 0 || width > MAX_DISPLAY_WIDTH || height > MAX_DISPLAY_HEIGHT) {
         return;
     } else if (!enabled) {
@@ -240,11 +250,13 @@ void Host_PresentFrame(void) {
     } else {
         convert(x, y, width, height);
     }
-    if (s_DumpDirectory != NULL && s_Blanks % s_DumpEvery == 0 && s_DumpVram) {
+    if (s_DumpDirectory == NULL || s_Blanks < s_DumpFrom) {
+        /* Not a dumped blank */
+    } else if (s_Blanks % s_DumpEvery == 0 && s_DumpVram) {
         convert(0, 0, VRAM_WIDTH, VRAM_HEIGHT);
         dump(VRAM_WIDTH, VRAM_HEIGHT);
         convert(x, y, width, height);
-    } else if (s_DumpDirectory != NULL && s_Blanks % s_DumpEvery == 0) {
+    } else if (s_Blanks % s_DumpEvery == 0) {
         dump(width, height);
     } else {
         /* Not a dumped blank */

@@ -57,8 +57,9 @@ is shows it by the same `game_frames.txt` hashes as before.
   AppImage's window on lavapipe in the container.
 - The game's objects: `CRASH2_GAME_CLOCK_OBJECTS=N,M` lists the live objects at those game frames in
   `DIR/objects_N.txt` (GOOL entry, subtype, state, the code word the pc is at, position and velocity), to find the
-  object a change concerns or follow one (Crash is `WillC`). `fps60=1` in a `CRASH2_SETTINGS` file runs at 60: a
-  schedule's frames doubled then play the same game.
+  object a change concerns or follow one (Crash is `WillC`). `fps60=1` in a `CRASH2_SETTINGS` file draws a frame
+  between each two of the game's: the game's own frames and state stay those of a run without it (the frames between
+  count none). `CRASH2_DUMP=DIR CRASH2_DUMP_EVERY=1 CRASH2_DUMP_FROM=N` writes each picture shown from blank N.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.

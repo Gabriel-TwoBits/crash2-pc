@@ -299,18 +299,17 @@ matching"):
       16:9 chosen when a level opens, its frame buffers are the host's, 256 KB (`FRAME_PRIMITIVES_ALLOC`). The objects
       still come and go by the game's draw lists. No side-on path reached by the schedules yet: the lists' merging was
       run on Turtle Woods' paths (5,900 game frames) before it was kept to the side-on ones.
-13. **The frame rate (done, 60 as an option).** `Gfx_EndFrame` waits a second vertical blank only for a game frame
-    shorter than 25 ticks, and gives each frame its length in blanks of 17 ticks (17, 34 or 51), by which the game's
-    motion, turning and the GOOL code's velocities scale; the GOOL code's waits count frames of 30 (the ticks over 34).
-    With 60 FPS chosen the second wait is left out (`FRAME_HALF_RATE`, crash2-decomp d266b12), each frame 17 ticks.
-    - **The collision's rounding:** an object's step through the world's collision has its x and z rounded down to a
-      2048-unit grid, which takes 3% of a running Crash's step at 30 and 12% at 60. `src/motion.c` wraps the step
-      (`OBJECT_MOVE`, crash2-decomp 736fefd): what the rounding takes of a frame's step is carried into the next, and
-      what it takes of that one lost, so two frames at 60 move as one at 30.
-    - **Measured** (`CRASH2_GAME_CLOCK_OBJECTS`, the schedules' frames doubled at 60): running, Crash covers 90,112
-      units every 136 ticks at both rates; a jump goes through the same states to the same height; on Turtle Woods
-      run blind for 450 frames of 30 (jumps, spins, crates, fruit) Crash stays within some 20,000 units of the 30
-      run's place (half a frame of 30), the same crates and fruit around him.
-    - **Left:** what the GOOL code counts by its own runs, not by the ticks: the warp room's first scene with Cortex
-      moves its camera on sooner at 60 (the speech, by its sound, keeps its time). Off by default.
+13. **The frame rate (done, 60 as an option).** The game's logic stays at its 30 frames a second, as on the
+    PlayStation, and a frame of the picture alone is drawn between two of its (`src/between.c`, decomp's
+    `FRAME_BETWEEN`, `FRAME_BETWEEN_SHOWN` and `FRAME_ENDED`, crash2-decomp d7053e9): at a game frame's end the camera
+    and each object (position, angles, scale) are set halfway from the frame before, a loop of `Sys_MainLoop` runs the
+    game's own drawing (the view, the world, the objects with none of their logic, the fade and bands of
+    `Gfx_EndFrame`) into the buffer being built, and they go back. The host shows the frames in their order, the one
+    between and then the game's, a vertical blank each. The models' animations step at 30.
+    - **First tried:** each game frame a vertical blank long, the game measuring a frame's length in blanks. The motion
+      scaled, but the GOOL code counts by its runs: twice the sounds (one 20 times where 30 frames a second play it
+      11), some never heard at 30, the menus and the memory card's screens twice as fast. Left out.
+    - **Checked:** with it on, the game's objects at Turtle Woods' frames are those of the 30 frames a second run, and
+      the memory-card run saves the same card; the camera shown moves on in even steps, the frame between halfway;
+      the pause menu's frames alike.
 14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
