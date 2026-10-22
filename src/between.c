@@ -56,6 +56,8 @@ extern unsigned char *g_DrawBuffer;
  * card's screens set (decomp's Gfx_EndFrame) */
 extern int32_t D_800675AC;
 extern int32_t D_8006CB94;
+/* Whether the game is paused, its pause screen's opening and closing too (decomp's Sys_MainLoop) */
+extern int32_t g_Paused;
 #define FLAGS_COUNTERS_STOPPED 0x200000
 void func_800163C4(int32_t *frame);
 int VSync(int mode);
@@ -174,10 +176,12 @@ void Host_FrameEnded(void) {
     WorldView_FrameEnded();
     s_DrawnX = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV);
     s_DrawnY = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV + sizeof(int16_t));
-    if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED)) {
+    if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED) ||
+        g_Paused != 0) {
         /* Off; or a game frame that drew nothing (the game leaves the buffers as they are while a level opens); or
-         * the memory card's screens, whose game frames the game runs a vertical blank each, at 60 already: the
-         * display the game's own */
+         * the memory card's screens, whose game frames the game runs a vertical blank each, at 60 already; or the
+         * pause, whose picture shrinks into its corner from the frame shown before, which a frame between redrawn
+         * would alternate with: the display the game's own */
         s_ShownCount = 0;
         return;
     } else {

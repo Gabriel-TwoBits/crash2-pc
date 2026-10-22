@@ -342,6 +342,9 @@ matching"):
       the memory-card run saves the same card; the camera shown moves on in even steps, the frame between halfway;
       the pause menu's frames alike.
     - **No frame between** where the game draws none (`D_800675AC`, while a level opens) or stops its counters (the
-      memory card's screens, which it runs a vertical blank a frame already). A frame is shown at its display
-      environment's corner: the drawing area's, 12 lines lower on the memory card's screens, shook the picture.
+      memory card's screens, which it runs a vertical blank a frame already), nor while it is paused (`g_Paused`, its
+      opening and closing too): the pause screen's picture shrinks into its corner from the frame shown before, and a
+      frame between, its scene drawn anew, alternated with it each vertical blank, a stutter as it opened and closed.
+      A frame is shown at its display environment's corner: the drawing area's, 12 lines lower on the memory card's
+      screens, shook the picture.
 14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
