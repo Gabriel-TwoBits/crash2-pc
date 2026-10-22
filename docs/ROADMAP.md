@@ -289,6 +289,16 @@ matching"):
     the projection); objects the game culls by its own 4:3 bounds would come in late at the edges, none seen so far.
     The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
     plays the same frames as before. The software picture narrows too.
+    - **The world beside the view:** the game draws only the polygons its camera path's sort list (SLST) holds at the
+      camera's node, made for 4:3: side-on, the edges showed the background where the world stopped. `src/world_view.c`
+      adds the polygons of the lists 6 nodes ahead and behind (decoded from the camera's by the game's decoder), each
+      after the one it follows in its own list, of the worlds the camera's list draws from (another may not be loaded),
+      through `WORLD_SORT_LIST` (crash2-decomp a3ccf38). Only on the side-on paths, kinds 3 and 8 by Crash2Recomp's
+      notes: along a path into the view the nodes behind lie behind the camera, whose polygons the renderer drew as
+      shards. More polygons take more primitives (the frame buffers' 89 KB already 76 used on Turtle Woods): with
+      16:9 chosen when a level opens, its frame buffers are the host's, 256 KB (`FRAME_PRIMITIVES_ALLOC`). The objects
+      still come and go by the game's draw lists. No side-on path reached by the schedules yet: the lists' merging was
+      run on Turtle Woods' paths (5,900 game frames) before it was kept to the side-on ones.
 13. **The frame rate (done, 60 as an option).** `Gfx_EndFrame` waits a second vertical blank only for a game frame
     shorter than 25 ticks, and gives each frame its length in blanks of 17 ticks (17, 34 or 51), by which the game's
     motion, turning and the GOOL code's velocities scale; the GOOL code's waits count frames of 30 (the ticks over 34).
