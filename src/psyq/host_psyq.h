@@ -15,6 +15,9 @@ int Host_Blanks(void);
 /* Where libgpu last put the display, and whether it shows (libgpu.c) */
 void Host_DisplayArea(int *x, int *y, int *width, int *height, int *enabled);
 
+/* The SPU set up as libspu's SpuInit leaves it, on the sound libraries' first call (libspu.c) */
+void Host_SpuStart(void);
+
 /* The pad buffers' refresh at a vertical blank (pad.c) */
 void Host_PadVerticalBlank(void);
 

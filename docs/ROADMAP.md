@@ -142,5 +142,13 @@ matching"):
    - **Input (done):** `src/input.c` reads the keyboard and the first gamepad through SDL3, and `src/psyq/pad.c`
      writes them into the pad's buffer at each vertical blank: a digital pad's buttons, 0 while pressed, in psx-spx's
      order. Without a window, no button is pressed.
-   - **Left:** the SPU and libsnd's sequencer, the memory card in files.
+   - **SPU (done):** SwanStation's (`third_party/swanstation/core/spu.cpp`, ADPCM voices, ADSR, reverb), driven by
+     `src/spu_host.cpp` with each frame's CPU cycles, its 44.1 kHz frames to an SDL3 audio stream (`src/audio.c`).
+     `src/psyq/libspu.c` writes its registers for the libspu functions the game calls, 9 of them by addresses the
+     split leaves unnamed: SpuSetKey (0x80051078), SpuGetAllKeysStatus (0x8005182C), SpuSetVoiceAttr (0x800518B8),
+     SpuSetCommonAttr (0x800513D8), SpuSetTransferMode (0x800512F8), SpuSetTransferStartAddr (0x80051298), SpuWrite
+     (0x80051238), SpuSetReverbModeParam (0x800501A8), SpuSetReverb (0x8004FE38), by their arguments and uses in
+     decomp's `src/game/800324A8.c` and `800123F0.c`; the structures' layouts from how the game fills them. The
+     reverb's presets are psx-spx's. The game's own sound effects go through them.
+   - **Left:** libsnd's sequencer, for the music; the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.

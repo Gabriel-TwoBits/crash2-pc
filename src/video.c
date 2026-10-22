@@ -3,6 +3,7 @@
 #include <stdlib.h>
 
 #include "gpu.h"
+#include "audio.h"
 #include "host_log.h"
 #include "input.h"
 #include "psyq/host_psyq.h"
@@ -80,6 +81,7 @@ static void start(void) {
         SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, SDL_LOGICAL_PRESENTATION_LETTERBOX);
         s_NextFrame = SDL_GetTicksNS();
         Host_InputStart();
+        Host_AudioStart();
     }
 }
 

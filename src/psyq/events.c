@@ -1,6 +1,8 @@
 #include <stddef.h>
+#include <stdint.h>
 
 #include "host_log.h"
+#include "audio.h"
 #include "game_clock.h"
 #include "psyq/host_psyq.h"
 #include "video.h"
@@ -43,6 +45,8 @@ static int s_Running[ROOT_COUNTERS];
 /* CPU cycles, times VIDEO_HZ, since root counter 2's last interrupt */
 static unsigned long long s_Counter2Cycles;
 static int s_Frames;
+/* CPU cycles, times VIDEO_HZ, not yet given to the SPU */
+static unsigned long long s_SpuCycles;
 
 static Event *event_of(int handle) {
     unsigned int index = (unsigned int)handle & EVENT_HANDLE_MASK;
@@ -194,6 +198,9 @@ void Host_VerticalBlank(void) {
     Host_PresentFrame();
     Host_PadVerticalBlank();
     counter2_frame();
+    s_SpuCycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
+    Host_AudioFrame((uint32_t)(s_SpuCycles / VIDEO_HZ));
+    s_SpuCycles %= VIDEO_HZ;
     if (s_Frames % FRAMES_PER_LOG == 0) {
         Host_Log("vertical blank %d", s_Frames);
     } else {

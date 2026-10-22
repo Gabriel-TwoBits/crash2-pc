@@ -62,12 +62,15 @@ set_source_files_properties(${HOST_DATA} PROPERTIES GENERATED TRUE COMPILE_OPTIO
 
 add_executable(crash2
     src/main.c
+    src/audio.c
     src/game_clock.c
     src/host_log.c
     src/input.c
     src/gpu.c
     src/gpu_raster.cpp
     third_party/swanstation/core/gpu_sw_backend.cpp
+    src/spu_host.cpp
+    third_party/swanstation/core/spu.cpp
     src/gte.c
     src/low_ram.c
     src/sampler.c
@@ -88,7 +91,7 @@ add_executable(crash2
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11 -Wall -Wextra -fPIC>)
 target_include_directories(crash2 PRIVATE src)
 # SwanStation's rasterizer (third_party/swanstation/README.md), C++17 as it is written
-target_include_directories(crash2 PRIVATE third_party/swanstation third_party/swanstation/core)
+target_include_directories(crash2 PRIVATE src/spu_shim third_party/swanstation third_party/swanstation/core)
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++17 -fPIC>)
 target_link_libraries(crash2 PRIVATE SDL3::SDL3-shared m)
 # libgte's functions run decomp's GTE model (include/gte.h): compiled as the game's C is
