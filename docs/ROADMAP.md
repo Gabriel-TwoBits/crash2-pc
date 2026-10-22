@@ -290,29 +290,31 @@ matching"):
     The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
     plays the same frames as before. The software picture narrows too.
     - **The world beside the view:** the game draws only the polygons its camera path's sort list (SLST) holds at the
-      camera's node, made for 4:3: side-on, the edges showed the background where the world stopped. `src/world_view.c`
-      adds the polygons of the lists 12 nodes ahead and behind (decoded from the camera's by the game's decoder), each
-      after the one it follows in its own list, of the worlds the camera's list draws from (another may not be loaded),
-      through `WORLD_SORT_LIST` (crash2-decomp a3ccf38). Only on the side-on paths, kinds 3 and 8 by Crash2Recomp's
-      notes: along a path into the view the lists ahead and behind add nothing seen (Turtle Woods' pictures the same
-      to the byte). The lists are decoded from a copy of the camera's: the game's backward decoding undoes a delta's
-      swaps on the list it starts from, and decoding from the game's own list scrambled it, so the game's next
-      decoding went wrong (garbage polygons, then its memory and the textures overwritten; the shards once taken for
-      polygons behind the camera). More polygons take more primitives (the frame buffers' 89 KB already 76 used on
-      Turtle Woods): with 16:9 chosen when a level opens, its frame buffers are the host's, 256 KB
-      (`FRAME_PRIMITIVES_ALLOC`); chosen while one is open, they become the host's at the end of that game frame
-      (`FRAME_ENDED`, where the frame drawn has gone to the GPU and the one being built is empty), the game's freed;
-      before, 16:9 chosen from the pause menu added nothing until the level opened again. The objects still come and
-      go by the game's draw lists. The SLST entry is read only
-      when its page is in memory, as `Nsf_OpenEntry` finds it without opening it: opened each frame, with its wait,
-      it could page in from the disc while the frame was drawn. No side-on path reached by the schedules yet: the
-      lists' merging was run on Turtle Woods' paths (5,900 game frames), the game's list checked unchanged by it.
+      camera's node, made for 4:3: wider, the edges showed the background where the world stopped. `src/world_view.c`
+      adds polygons to the list drawn, through `WORLD_SORT_LIST` (crash2-decomp a3ccf38). More polygons take more
+      primitives (the frame buffers' 89 KB already 76 used on Turtle Woods): with 16:9 chosen when a level opens, its
+      frame buffers are the host's, 256 KB (`FRAME_PRIMITIVES_ALLOC`); chosen while one is open, they become the
+      host's at the end of that game frame (`FRAME_ENDED`, where the frame drawn has gone to the GPU and the one being
+      built is empty), the game's freed; before, 16:9 chosen from the pause menu added nothing until the level opened
+      again. The objects still come and go by the game's draw lists.
+    - **The lists around, dropped:** first, on the side-on paths (kinds 3 and 8 by Crash2Recomp's notes), the polygons
+      of the lists 12 nodes ahead and behind were added, decoded from the camera's by the game's decoder. Its backward
+      decoding undoes a delta's swaps on the list it starts from: decoding from the game's own list scrambled it, the
+      game's next decoding went wrong (garbage polygons, then its memory and the textures overwritten), so the lists
+      were decoded from a copy. A decoding from a list not the node's own can loop for ever (`slst_merge`: a run to
+      insert past the list's end, never reached), and on Snow Go's bonus, dropped into from above, the picture stopped
+      for good with the bonus' title half in: the camera's list and node apart there is the likely cause, not
+      reproduced (no schedule reaches it). The worlds beside cover what the lists around added, without decoding.
     - **The worlds beside, on every path:** the lists around don't hold all that 16:9 shows (in the warp room, path
-      kind 4, they add 2 to 4 polygons; on Turtle Woods' paths into the view, nothing seen), so each frame the loaded
+      kind 4, they added 2 to 4 polygons; on Turtle Woods' paths into the view, nothing seen), so each frame the loaded
       worlds' polygons are projected as the GTE will (its rotation, H and offsets, as `Gfx_DrawWorlds` finds them;
       a corner nearer than its division's limit, H / 2, at twice its offset) and those beside the 4:3 picture that
       no list holds are added: every corner in front of the camera, their bounds on the screen and past the 4:3
-      picture's edge, with a 16-pixel margin both ways. The worlds' headers count their vertices (word 4), triangles
+      picture's edge, with a 16-pixel margin both ways, the GPU drawing them (narrower than 1,024 pixels, lower than
+      512). A polygon reaching behind the camera is left out, a hole where it would show beside it (in Snow Go's
+      bonus' narrow shaft, black wedges at the edges): projected outward as the GTE does, it stretched over what lay
+      beside (tried, black triangles and smears at Turtle Woods' edges); clipped at the camera, its pieces drawn by the
+      host, it would show. The worlds' headers count their vertices (word 4), triangles
       (5) and quads (6), checked against their tables' sizes; a world not loaded has none. The warp room's right edge
       and Turtle Woods' corners now drawn; at most 897 polygons added and 102 KB of primitives a frame on Turtle
       Woods; the game's objects at 16:9 the same as before at 6 game frames.

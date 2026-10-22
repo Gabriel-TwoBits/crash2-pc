@@ -9,50 +9,35 @@
 /* The world's polygons beside the camera's view, for the wide view (the 16:9 shape). The game draws only the polygons
  * its camera path's sort list holds at the camera's node (an SLST entry: the list at the path's first node, then each
  * node's delta from the one before), made for a 4:3 view: wider, the edges showed the background where the world
- * stopped. So the list drawn is the camera's own with polygons added:
- * - on the side-on paths, those of the lists NODES_AROUND nodes ahead and behind, each placed after the polygon it
- *   follows in its own list, of the worlds the camera's list draws from (another's may not be loaded), decoded from
- *   the camera's by the game's own decoder;
- * - on every path, the loaded worlds' polygons no list added that show beside the 4:3 picture, found by projecting
- *   their corners as the GTE will (with a margin), placed by their depth among the camera's: the game draws a list
- *   from its end, the nearest first, and links each polygon no nearer than those before it (link_primitive).
+ * stopped. So the list drawn is the camera's own with the loaded worlds' polygons added that show beside the 4:3
+ * picture, found by projecting their corners as the GTE will (with a margin), placed by their depth among the
+ * camera's: the game draws a list from its end, the nearest first, and links each polygon no nearer than those before
+ * it (link_primitive). The lists of the camera's nodes around aren't decoded for more: from a list not the node's own
+ * (the camera's list and node apart), the game's decoding can loop for ever (slst_merge, a run to insert past the
+ * list's end).
  * More polygons take more primitives than the game's frame buffers hold (76 of their 89 KB used on Turtle Woods, 102
  * with the polygons added): with the wide view chosen, its frame buffers are the host's own, larger, from the level's
  * opening or from the end of the frame it was chosen in. The objects come and go as the game's draw lists have them:
  * one at the edge may still come in late.
- * TRADEOFF: a fixed count of nodes around; how far a node reaches across differs from path to path. A polygon is
- * placed by the sum of its corners' depths, which misorders long ones beside short ones as the game's own sort does.
- * Beside the 4:3 picture the faces turned away are drawn too (the world doesn't mark them, its lists leave them out),
- * behind the faces nearer by depth; a test of each against those drawn would leave them out */
+ * TRADEOFF: a polygon is placed by the sum of its corners' depths, which misorders long ones beside short ones as the
+ * game's own sort does. Beside the 4:3 picture the faces turned away are drawn too (the world doesn't mark them, its
+ * lists leave them out), behind the faces nearer by depth; a test of each against those drawn would leave them out.
+ * A polygon reaching behind the camera is left out, a hole beside it where it would show: clipped at the camera, its
+ * pieces drawn by the host, it would show */
 
-#define NODES_AROUND 12
-/* The camera paths that look at the world side-on, whose nodes ahead and behind lie across the view (path kinds 3 and
- * 8, by Crash2Recomp's notes: decomp's config/symbol_addrs.txt). Along a path into the view they lie ahead of the
- * camera and behind it and add nothing seen (Turtle Woods' pictures the same to the byte): those keep the camera's
- * list */
-#define PATH_SIDE_ON 3
-#define PATH_SIDE_ON_TOO 8
 /* The sort lists: a count, a word unused, then the entries (decomp's 80039D2C.c, SORT_LIST_ENTRIES) */
 #define SORT_LIST_ENTRIES 0x5F0
 #define SORT_LIST_FIRST 2
-#define SORT_LIST_HALVES (SORT_LIST_FIRST + SORT_LIST_ENTRIES)
-/* The list drawn: the camera's and the others' added, three lists' worth at most */
+/* The list drawn: the camera's and the polygons added, three lists' worth at most */
 #define WIDE_LIST_ENTRIES (SORT_LIST_ENTRIES * 3)
 #define ENTRY_VALUES 65536
 /* An entry's world, of the zone's 8 (decomp's 80039D2C.c, ENTRY_WORLD_SHIFT) */
 #define ENTRY_WORLD_SHIFT 13
 #define NOWHERE 0xFFFF
 #define ADDED 0xFFFE
-#define DEPTH_LISTED INT32_MAX
-/* The entity's property for its sort list (SLST), as Cam_MoveAlongPath reads it, and an entry's items from 0x10 */
-#define PROPERTY_SORT_LIST 0x103
-#define PROPERTY_ROW_KIND 2
-#define ENTRY_ITEMS 0x10
-/* A word's low bit: an EID (or a page's), not a pointer */
+/* A word's low bit: an EID, not a pointer */
 #define EID_TAG 1
 #define WORD_BYTES 4
-#define FORWARD 1
-#define BACKWARD 0
 /* The frame buffers' primitives: the PlayStation's 0x16400 bytes a frame (twice the PAL's), the host's larger */
 #define HOST_PRIMITIVE_BYTES 0x40000
 #define HOST_FRAME_BUFFERS 2
@@ -110,9 +95,17 @@ extern unsigned int g_HostGte[];
 #define GTE_H 26
 #define GTE_H_MASK 0xFFFF
 #define GTE_FRACTION_SHIFT 12
-/* The GTE's quotient H / depth stops at 2 (its division's limit, a depth up to H / 2): a corner nearer is projected
- * at twice its offset from the screen's centre */
+/* The GTE's quotient H / depth stops at 2 (its division's limit, a depth up to H / 2): a corner nearer is projected at
+ * twice its offset from the screen's centre (IR1 and IR2, 16-bit), and the projection kept on the GTE's screen (SXY,
+ * 11-bit) */
 #define QUOTIENT_MOST 2
+#define GTE_IR_MIN (-0x8000)
+#define GTE_IR_MAX 0x7FFF
+#define GTE_SCREEN_MIN (-0x400)
+#define GTE_SCREEN_MAX 0x3FF
+/* The GPU leaves out a polygon as wide as 1,024 pixels or as high as 512 */
+#define GPU_POLYGON_WIDTH 1024
+#define GPU_POLYGON_HEIGHT 512
 /* The margin, in pixels, the polygons beside are found with past the screen's edges and inside the 4:3 picture's, so
  * that one at an edge is drawn from before it shows, whatever the GTE's rounding */
 #define BESIDE_MARGIN 16
@@ -126,33 +119,23 @@ extern unsigned char *g_CurrentZone;
 /* The game's (decomp's include/game.h, 80026CA0.c) */
 int32_t Heap_Alloc(int32_t bytes);
 void Heap_Free(int32_t buffer);
-int32_t Ent_GetProperty(int32_t entity, int32_t property, int32_t row, int32_t column, int32_t *out, int32_t kind,
-                        int32_t *count, int32_t a, int32_t b);
-uint16_t *func_80029800(uint16_t *delta, int32_t from, uint16_t *to, int32_t forward);
 extern int32_t g_CameraPath;
-extern int32_t g_CameraNode;
-extern int32_t g_CameraNodeCount;
-extern uint32_t g_CameraPathKind;
 
 static unsigned char s_Primitives[HOST_FRAME_BUFFERS][HOST_PRIMITIVE_BYTES] __attribute__((aligned(16)));
 static int s_PrimitivesTaken[HOST_FRAME_BUFFERS];
 /* Whether the frame buffers in use are the host's (the wide view chosen when the level opened, or since) */
 static int s_LargeBuffers;
 
-static uint16_t s_Around[2][SORT_LIST_HALVES];
 static uint16_t s_Wide[SORT_LIST_FIRST + WIDE_LIST_ENTRIES];
 /* An entry's place in the camera's list (NOWHERE if not there, ADDED if added already), and the entries added with
  * the camera's entry each follows */
 static uint16_t s_Place[ENTRY_VALUES];
 static uint16_t s_Added[WIDE_LIST_ENTRIES];
 static uint16_t s_AddedAfter[WIDE_LIST_ENTRIES];
-/* An added entry's depth (the sum of the depths of the corners the game's depth slot sums), DEPTH_LISTED for one of
- * the lists around, which keeps its list's place */
+/* An added entry's depth: the sum of the depths of the corners the game's depth slot sums */
 static int32_t s_AddedDepth[WIDE_LIST_ENTRIES];
 static int s_AddedCount;
 static int s_Order[WIDE_LIST_ENTRIES];
-/* The worlds the camera's list draws from, a bit each */
-static uint32_t s_WorldsUsed;
 /* The camera's entries' depths, and the most of each from it to the list's end */
 static int32_t s_CameraDepth[SORT_LIST_ENTRIES];
 static int32_t s_DepthOnward[SORT_LIST_ENTRIES];
@@ -236,56 +219,7 @@ void WorldView_FrameEnded(void) {
     }
 }
 
-/* The list at a node near the camera's: the camera's decoded steps nodes along, or as far as the path goes. The
- * decoding goes from a copy: backward, it undoes the delta's swaps on the list it starts from, which would leave the
- * game's own list scrambled for its next decoding */
-static const uint16_t *list_at(const uint16_t *camera, uint16_t *const *items, int steps, int direction,
-                               uint16_t (*buffers)[SORT_LIST_HALVES]) {
-    int current = 0;
-    int step;
-
-    memcpy(buffers[current], camera, sizeof(camera[0]) * (size_t)(SORT_LIST_FIRST + (int16_t)camera[0]));
-    for (step = 0; step < steps; step++) {
-        int node = g_CameraNode + (direction == FORWARD ? step + 1 : -step);
-
-        if (node < 1 || node >= g_CameraNodeCount) {
-            break;
-        } else {
-            func_80029800(items[node], (int32_t)(uintptr_t)buffers[current], buffers[!current], direction);
-            current = !current;
-        }
-    }
-    return buffers[current];
-}
-
-/* Another list's entries the camera's lacks, each after the camera's entry it follows there (or before them all) */
-static void add_from(const uint16_t *list) {
-    uint16_t after = NOWHERE;
-    int index;
-
-    for (index = 0; index < (int16_t)list[0]; index++) {
-        uint16_t entry = list[SORT_LIST_FIRST + index];
-
-        if (s_Place[entry] == ADDED) {
-            /* Added from a list before */
-        } else if (s_Place[entry] != NOWHERE) {
-            after = s_Place[entry];
-        } else if (!(s_WorldsUsed & (1u << (entry >> ENTRY_WORLD_SHIFT)))) {
-            /* A world the camera's list doesn't draw from, which may not be loaded */
-        } else if (s_AddedCount < WIDE_LIST_ENTRIES - SORT_LIST_ENTRIES) {
-            s_Added[s_AddedCount] = entry;
-            s_AddedAfter[s_AddedCount] = after;
-            s_AddedDepth[s_AddedCount] = DEPTH_LISTED;
-            s_AddedCount++;
-            s_Place[entry] = ADDED;
-        } else {
-            /* The list drawn full */
-        }
-    }
-}
-
-/* Added entries in the list drawn's order: by the camera's entry each follows, then the farther first (the lists
- * around's first, in their own order) */
+/* Added entries in the list drawn's order: by the camera's entry each follows, then the farther first */
 static int added_order(const void *left_item, const void *right_item) {
     int left = *(const int *)left_item;
     int right = *(const int *)right_item;
@@ -425,9 +359,21 @@ static int entry_corners(uint16_t entry, const int32_t *header, uint32_t *corner
     }
 }
 
-/* Whether an entry's polygon shows beside the 4:3 picture: every corner in front of the camera, and its bounds as the
- * GTE projects it on the screen and past the 4:3 picture's edge on one side, both with the margin. Its depth, the sum
- * of those of the corners the game's depth slot sums, and whether it lies wholly outside the 4:3 picture */
+static int64_t clamped(int64_t value, int64_t low, int64_t high) {
+    if (value < low) {
+        return low;
+    } else if (value > high) {
+        return high;
+    } else {
+        return value;
+    }
+}
+
+/* Whether an entry's polygon shows beside the 4:3 picture: every corner in front of the camera (one behind it the GTE
+ * projects outward, stretching the polygon over what lies beside: tried, holes and smears at Turtle Woods' edges), its
+ * bounds as the GTE projects it on the screen and past the 4:3 picture's edge on one side, both with the margin, and
+ * the GPU drawing it. Its depth, the sum of those of the corners the game's depth slot sums, and whether it lies
+ * wholly outside the 4:3 picture */
 static int beside(uint16_t entry, int32_t *depth, int *outside) {
     int world = entry >> ENTRY_WORLD_SHIFT;
     const int32_t *header = world_header(world);
@@ -463,24 +409,24 @@ static int beside(uint16_t entry, int32_t *depth, int *outside) {
         } else {
             /* A quad's first corner, which the game's depth slot leaves out */
         }
-        if (view[2] <= 0) {
-            /* Behind the camera: the GTE's projection of it is no position */
-            behind = 1;
-            continue;
-        } else if (view[2] * QUOTIENT_MOST <= h) {
-            x = view[0] * QUOTIENT_MOST * WIDE_NUMERATOR / WIDE_DENOMINATOR;
-            y = view[1] * QUOTIENT_MOST;
+        if (view[2] * QUOTIENT_MOST <= h) {
+            x = clamped(view[0], GTE_IR_MIN, GTE_IR_MAX) * QUOTIENT_MOST * WIDE_NUMERATOR / WIDE_DENOMINATOR;
+            y = clamped(view[1], GTE_IR_MIN, GTE_IR_MAX) * QUOTIENT_MOST;
         } else {
             x = h * view[0] / view[2] * WIDE_NUMERATOR / WIDE_DENOMINATOR;
             y = h * view[1] / view[2];
         }
+        behind |= view[2] <= 0;
+        x = clamped(x, GTE_SCREEN_MIN - half_width, GTE_SCREEN_MAX - half_width);
+        y = clamped(y, GTE_SCREEN_MIN - half_height, GTE_SCREEN_MAX - half_height);
         low_x = x < low_x ? x : low_x;
         high_x = x > high_x ? x : high_x;
         low_y = y < low_y ? y : low_y;
         high_y = y > high_y ? y : high_y;
     }
     *outside = low_x > band || high_x < -band;
-    return !behind && high_x > -half_width - BESIDE_MARGIN && low_x < half_width + BESIDE_MARGIN &&
+    return !behind && high_x - low_x < GPU_POLYGON_WIDTH && high_y - low_y < GPU_POLYGON_HEIGHT &&
+           high_x > -half_width - BESIDE_MARGIN && low_x < half_width + BESIDE_MARGIN &&
            high_y > -half_height - BESIDE_MARGIN && low_y < half_height + BESIDE_MARGIN &&
            (high_x > band - BESIDE_MARGIN || low_x < BESIDE_MARGIN - band);
 }
@@ -586,61 +532,19 @@ static void add_worlds_beside(int count) {
     }
 }
 
-/* An entry by its reference if the paging has it in memory, NULL if not: as Nsf_OpenEntry finds it, without its
- * opening (which pages it in and counts a holder) */
-static unsigned char *resident(const uint32_t *reference) {
-    uint32_t record;
-    uint32_t entry;
-
-    if (reference == NULL) {
-        return NULL;
-    } else {
-        record = *reference;
-    }
-    if ((record & EID_TAG) || record == 0) {
-        /* An EID not looked up yet */
-        return NULL;
-    } else {
-        entry = *(const uint32_t *)(uintptr_t)record;
-    }
-    if (entry & EID_TAG) {
-        /* Its page not in memory */
-        return NULL;
-    } else {
-        return (unsigned char *)(uintptr_t)entry;
-    }
-}
-
 uint16_t *Host_WorldSortList(uint16_t *camera) {
-    const uint32_t *reference;
-    unsigned char *entry = NULL;
     int count = (int16_t)camera[0];
     int index;
 
     if (!wide() || !s_LargeBuffers || g_CameraPath == 0 || count <= 0 || g_CurrentZone == NULL) {
         return camera;
-    } else if (g_CameraPathKind == PATH_SIDE_ON || g_CameraPathKind == PATH_SIDE_ON_TOO) {
-        reference = (const uint32_t *)(uintptr_t)Ent_GetProperty(g_CameraPath, PROPERTY_SORT_LIST, 0, 0, 0,
-                                                                 PROPERTY_ROW_KIND, 0, 0, 0);
-        entry = resident(reference);
     } else {
-        /* Along a path into the view, the worlds beside alone */
+        memset(s_Place, 0xFF, sizeof(s_Place));
     }
-    memset(s_Place, 0xFF, sizeof(s_Place));
-    s_WorldsUsed = 0;
     for (index = 0; index < count; index++) {
         s_Place[camera[SORT_LIST_FIRST + index]] = (uint16_t)index;
-        s_WorldsUsed |= 1u << (camera[SORT_LIST_FIRST + index] >> ENTRY_WORLD_SHIFT);
     }
     s_AddedCount = 0;
-    if (entry != NULL) {
-        uint16_t *const *items = (uint16_t *const *)(entry + ENTRY_ITEMS);
-
-        add_from(list_at(camera, items, NODES_AROUND, FORWARD, s_Around));
-        add_from(list_at(camera, items, NODES_AROUND, BACKWARD, s_Around));
-    } else {
-        /* No lists around */
-    }
     take_scene();
     camera_depths(camera, count);
     add_worlds_beside(count);
