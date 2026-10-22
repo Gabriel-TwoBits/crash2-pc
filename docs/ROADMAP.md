@@ -300,7 +300,10 @@ matching"):
       decoding went wrong (garbage polygons, then its memory and the textures overwritten; the shards once taken for
       polygons behind the camera). More polygons take more primitives (the frame buffers' 89 KB already 76 used on
       Turtle Woods): with 16:9 chosen when a level opens, its frame buffers are the host's, 256 KB
-      (`FRAME_PRIMITIVES_ALLOC`). The objects still come and go by the game's draw lists. The SLST entry is read only
+      (`FRAME_PRIMITIVES_ALLOC`); chosen while one is open, they become the host's at the end of that game frame
+      (`FRAME_ENDED`, where the frame drawn has gone to the GPU and the one being built is empty), the game's freed;
+      before, 16:9 chosen from the pause menu added nothing until the level opened again. The objects still come and
+      go by the game's draw lists. The SLST entry is read only
       when its page is in memory, as `Nsf_OpenEntry` finds it without opening it: opened each frame, with its wait,
       it could page in from the disc while the frame was drawn. No side-on path reached by the schedules yet: the
       lists' merging was run on Turtle Woods' paths (5,900 game frames), the game's list checked unchanged by it.

@@ -3,6 +3,7 @@
 
 #include "host_log.h"
 #include "settings.h"
+#include "world_view.h"
 
 /* The world's polygons beside the camera's view, for the wide view (the 16:9 shape). The game draws only the polygons
  * its camera path's sort list holds at the camera's node (an SLST entry: the list at the path's first node, then each
@@ -12,8 +13,9 @@
  * within one alone), of the worlds the camera's list draws from (another's may not be loaded). The lists ahead and
  * behind are decoded from the camera's by the game's own decoder.
  * More polygons take more primitives than the game's frame buffers hold (76 of their 89 KB used on Turtle Woods): with
- * the wide view chosen when a level opens, its frame buffers are the host's own, larger. The objects come and go as
- * the game's draw lists have them: one at the edge may still come in late.
+ * the wide view chosen, its frame buffers are the host's own, larger, from the level's opening or from the end of the
+ * frame it was chosen in. The objects come and go as the game's draw lists have them: one at the edge may still come
+ * in late.
  * TRADEOFF: a fixed count of nodes around; how far a node reaches across differs from path to path */
 
 #define NODES_AROUND 12
@@ -60,7 +62,7 @@ extern uint32_t g_CameraPathKind;
 
 static unsigned char s_Primitives[HOST_FRAME_BUFFERS][HOST_PRIMITIVE_BYTES] __attribute__((aligned(16)));
 static int s_PrimitivesTaken[HOST_FRAME_BUFFERS];
-/* Whether the frame buffers in use are the host's (the wide view chosen when the level opened) */
+/* Whether the frame buffers in use are the host's (the wide view chosen when the level opened, or since) */
 static int s_LargeBuffers;
 
 static uint16_t s_Around[2][SORT_LIST_HALVES];
@@ -124,6 +126,33 @@ void Host_FramePrimitivesFree(int32_t buffer) {
         }
     }
     Heap_Free(buffer);
+}
+
+/* A frame buffer's primitives (decomp's 800158E0.c, func_800163C4): their start, and where the next goes */
+#define FRAME_PRIMITIVES 1
+#define FRAME_PRIMITIVES_NEXT 2
+extern unsigned char *g_BuildBuffer[];
+extern unsigned char *g_DrawBuffer;
+
+static void take_large(unsigned char *frame_bytes) {
+    int32_t *frame = (int32_t *)frame_bytes;
+    int32_t buffer = frame[FRAME_PRIMITIVES];
+
+    frame[FRAME_PRIMITIVES] = Host_FramePrimitivesAlloc(HOST_PRIMITIVE_BYTES);
+    frame[FRAME_PRIMITIVES_NEXT] = frame[FRAME_PRIMITIVES];
+    Heap_Free(buffer);
+}
+
+/* The wide view chosen while a level is open: its frame buffers the host's from here, where the frame drawn has gone
+ * to the GPU and the frame being built is empty (decomp's Gfx_EndFrame, FRAME_ENDED) */
+void WorldView_FrameEnded(void) {
+    if (!wide() || s_LargeBuffers || g_BuildBuffer[0] == NULL || g_DrawBuffer == NULL ||
+        ((int32_t *)g_BuildBuffer[0])[FRAME_PRIMITIVES] == 0 || ((int32_t *)g_DrawBuffer)[FRAME_PRIMITIVES] == 0) {
+        return;
+    } else {
+        take_large(g_BuildBuffer[0]);
+        take_large(g_DrawBuffer);
+    }
 }
 
 /* The list at a node near the camera's: the camera's decoded steps nodes along, or as far as the path goes. The
