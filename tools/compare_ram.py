@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Compares the game's data and bss in two RAM dumps of the same game frame: decomp's tools/run_game.py --dump FRAME (the
-PlayStation in an emulator, OUT/ram_FRAME.bin) against the port's CRASH2_GAME_CLOCK_DUMPS (DIR/ram_FRAME.bin, at the
-same retail addresses). Only the variables the game's C names are compared: the libraries' own state is theirs, which
-the port's doesn't keep. Each symbol with a differing word is listed with its words. A word that holds the same place on
-both sides counts apart: the port's data, heap and scratchpad sit at other addresses, each moved by one offset
+"""Compares the game's data and bss in two RAM dumps of the same game frame: decomp's tools/run_game.py --dump FRAME
+(the PlayStation in an emulator, OUT/ram_FRAME.bin) against the port's CRASH2_GAME_CLOCK_DUMPS (DIR/ram_FRAME.bin, at
+the same retail addresses). Only the variables the game's C names are compared: the libraries' own state is theirs,
+which the port's doesn't keep. Each symbol with a differing word is listed with its words. A word that holds the same
+place on both sides counts apart: the port's data, heap and scratchpad sit at other addresses, each moved by one offset
 (src/main.c), and an address is a pointer or an ordering table's 24-bit link.
 
     python tools/compare_ram.py PS1.bin PORT.bin PROGRAM DECOMP
