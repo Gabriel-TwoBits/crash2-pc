@@ -232,18 +232,18 @@ matching"):
      its dialog with no error.
    - **Left:** Windows itself, which no machine here runs, and the AppImage on a desktop: their windows, sound and
      gamepads through SDL3.
-9. **Settings, in the game (done).** The port's options sit in the game's own menus, reached with the pad: OPTIONS,
-   a third item on the title's menu, and PC OPTIONS in the pause menu's OPTIONS, before DONE. Either shows the
-   settings in the menu's place, in its font and look (a value between the font's arrows, as the pause menu's MONO
-   and STEREO: its rows hold some 12 characters), and DONE goes back. The menu's own GOOL code moves the cursor, with
-   its sounds; `src/menus.c` patches four words of each menu's code where the game loads it (TitOC's, and DispC's as
-   the warp rooms and levels load it; the title's DispC is another entry), each an operation of the host's (decomp's
+9. **Settings, in the game (done).** The port's options sit in the game's own menus, reached with the pad: OPTIONS, a
+   third item on the title's menu, and PC OPTIONS in the pause menu's OPTIONS, before DONE. Either shows the settings in
+   the menu's place, in its font and look (a value between the font's arrows, as the pause menu's MONO and STEREO: its
+   rows hold some 12 characters), and DONE, triangle or circle go back. The settings' rows scroll under DONE, which
+   stays in view (4 rows on the title, 5 in the pause menu). The menu's own GOOL code moves the cursor, with its sounds;
+   `src/menus.c` patches four words of each menu's code where the game loads it (TitOC's, and DispC's as the warp rooms
+   and levels load it; the title's DispC is another entry), each an operation of the host's (decomp's
    `GOOL_HOST_OPERATION`) doing the replaced instruction's work besides its own, and only where each word holds that
-   instruction. TitOC's code already handles a third item, the PAL release's language, unreachable here: its sides
-   are left out. The settings, in `settings.ini` in the preference folder (headless, the defaults, never saved): the
-   window or full screen, the picture at 4:3 or stretched, sharp or smooth; the enhancements below add theirs. The
-   game plays the same frames but for the title menu's picture: the demo's run and the card's, their sound and the
-   card, as before.
+   instruction. TitOC's code already handles a third item, the PAL release's language, unreachable here: its sides are
+   left out. The settings, in `settings.ini` in the preference folder (headless, the defaults, never saved): the window
+   or full screen, the picture at 4:3 or stretched, sharp or smooth; the enhancements below add theirs. The game plays
+   the same frames but for the title menu's picture: the demo's run and the card's, their sound and the card, as before.
 10. **A GPU renderer (done).** `src/render.c` draws each primitive gpu.c hands the software rasterizer again, with
     SDL_GPU on Vulkan (SPIR-V from `shaders/`, compiled by glslang at the build), into a target of VRAM's size times
     the resolution (2, 3, 4, 6 or 8), in true colour without the dithering; the window shows the target's displayed
@@ -265,8 +265,7 @@ matching"):
     - **Found on the way:** with no window nothing waited on the GPU, and SDL_GPU's copies of the buffers ran the
       32-bit address space out: two pictures at most are in flight. `low_ram.c` helped any thread's fault near 0, the
       driver's too: it now helps only the port's own code.
-    - **Left:** texture filtering, anti-aliasing; the options show 4 rows on the title and 5 in the pause menu,
-      scrolling past them.
+    - **Left:** texture filtering, anti-aliasing.
 11. **Steady polygons (done).** The GTE rounds a projected vertex to whole pixels, so the PlayStation's polygons jitter,
     and its GPU steps a texture without the depth, so they warp. decomp's GTE model hands over each projection's view
     coordinates before their rounding (`GTE_PROJECTED`, crash2-decomp 152ade9); `src/precise.c` computes the position

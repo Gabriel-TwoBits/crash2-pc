@@ -90,6 +90,9 @@ enum {
 #define TEXT_END_EVENT 0xC00
 #define LEFT_PRESSED 0x64000u
 #define RIGHT_PRESSED 0x24000u
+/* Triangle or circle pressed, which close the options as DONE does (the menus' X is 0x81040: the pad's buttons with
+ * their two bytes swapped, triangle 0x10 and circle 0x20) */
+#define BACK_PRESSED 0x81030u
 
 /* A text animation (type 4): its header, the strings' count in it, then the strings */
 #define ANIMATION_HEADER_BYTES 12
@@ -257,28 +260,36 @@ static int visible_rows(void) {
     }
 }
 
-/* The rows from the first shown, as many as the menu has room for: each a text of its own item, which the cursor
- * lights as it does the menu's */
+/* The settings' rows shown at once: the menu's room less DONE's, which stays in view below them */
+static int visible_settings(void) {
+    return visible_rows() - 1;
+}
+
+/* The settings' rows from the first shown, as many as there is room for, then DONE: each a text of its own item, which
+ * the cursor lights as it does the menu's */
 static void show_rows(void *object) {
     int slot;
 
     end_texts(object);
-    for (slot = 0; slot < visible_rows() && s_FirstRow + slot < s_RowCount; slot++) {
+    for (slot = 0; slot < visible_settings() && s_FirstRow + slot < done_row(); slot++) {
         int row = s_FirstRow + slot;
 
         spawn_text(object, row * ITEM, &s_Rows[row], 0, row_height(slot));
     }
+    spawn_text(object, done_row() * ITEM, &s_Rows[done_row()], 0, row_height(slot));
 }
 
-/* The rows shown moved to keep the cursor's in view */
+/* The settings' rows shown moved to keep the cursor's in view (DONE always is) */
 static void follow_cursor(void *object) {
     int row = GOOL_REGISTER(object, CURSOR) / ITEM;
 
-    if (row < s_FirstRow) {
+    if (row == done_row()) {
+        return;
+    } else if (row < s_FirstRow) {
         s_FirstRow = row;
         show_rows(object);
-    } else if (row >= s_FirstRow + visible_rows()) {
-        s_FirstRow = row - visible_rows() + 1;
+    } else if (row >= s_FirstRow + visible_settings()) {
+        s_FirstRow = row - visible_settings() + 1;
         show_rows(object);
     } else {
         /* In view */
@@ -411,6 +422,11 @@ static void title_sides(void *object) {
         GOOL_WORD(object, OBJECT_STATE_TIME) = GOOL_WORD(object, OBJECT_FRAME_TIME);
         follow_cursor(object);
         sides(object);
+        if (Gool_OpTestPad(BACK_PRESSED, 0)) {
+            close_options(object);
+        } else {
+            /* Still open */
+        }
     } else {
         /* The menu's own */
     }
@@ -459,7 +475,10 @@ static void pause_choice(void *object) {
 }
 
 static void pause_sides(void *object) {
-    if (s_Menu == object) {
+    if (s_Menu == object && Gool_OpTestPad(BACK_PRESSED, 0)) {
+        /* The pause options started again, the word's value left unpushed: nothing after it runs */
+        close_options(object);
+    } else if (s_Menu == object) {
         follow_cursor(object);
         sides(object);
         push(object, 0);
