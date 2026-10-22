@@ -12,8 +12,8 @@ sound, the CD, the memory card and the pad.
 
 ## Status
 
-The game's C boots on the PC, headless: it reads the disc image and runs its title and attract demo, level after
-level, native code included, against stubs of most of the PlayStation's libraries. Nothing is shown or heard yet.
+The game's C runs on the PC from the disc image: the Naughty Dog logo, the title screen and the attract demo, its
+native code included, in a window drawn by a GPU in software. There is no sound and no input yet.
 The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built

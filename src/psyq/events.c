@@ -2,6 +2,7 @@
 
 #include "host_log.h"
 #include "psyq/host_psyq.h"
+#include "video.h"
 
 /* libapi's events and root counters, and libetc's VSync, on the game's own time: a VSync is one vertical blank, and
  * the root counter's interrupts come in the proportion of the CPU's cycles to a frame's.
@@ -184,6 +185,7 @@ static void counter2_frame(void) {
 
 void Host_VerticalBlank(void) {
     s_Frames++;
+    Host_PresentFrame();
     Host_PadVerticalBlank();
     counter2_frame();
     if (s_Frames % FRAMES_PER_LOG == 0) {

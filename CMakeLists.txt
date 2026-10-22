@@ -9,6 +9,19 @@ endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
+# SDL3 from its release, pinned, built for the 32-bit program: Debian's i386 package conflicts with backports' Mesa. A
+# shared library beside the program, out of the game's 8 MB at 0x80000000 (src/host.h); it loads the windowing and
+# audio libraries (X11, Wayland, PulseAudio, ALSA) at run time
+include(FetchContent)
+set(SDL_SHARED ON CACHE BOOL "" FORCE)
+set(SDL_STATIC OFF CACHE BOOL "" FORCE)
+set(SDL_TEST_LIBRARY OFF CACHE BOOL "" FORCE)
+set(SDL_EXAMPLES OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(SDL3
+    URL https://github.com/libsdl-org/SDL/releases/download/release-3.2.10/SDL3-3.2.10.tar.gz
+    URL_HASH SHA256=f87be7b4dec66db4098e9c167b2aa34e2ca10aeb5443bdde95ae03185ed513e0)
+FetchContent_MakeAvailable(SDL3)
+
 set(DECOMP ${CMAKE_SOURCE_DIR}/decomp)
 set(HOST_ASM ${CMAKE_BINARY_DIR}/host-asm)
 set(SPLIT_DATA ${DECOMP}/asm/data/data.data.s ${DECOMP}/asm/data/bss.bss.s ${DECOMP}/asm/data/rodata.rodata.s)
@@ -50,13 +63,17 @@ set_source_files_properties(${HOST_DATA} PROPERTIES GENERATED TRUE COMPILE_OPTIO
 add_executable(crash2
     src/main.c
     src/host_log.c
+    src/gpu.c
     src/gte.c
     src/low_ram.c
     src/sampler.c
     src/native.c
     src/handwritten.c
+    src/video.c
     src/psyq/events.c
     src/psyq/libcd.c
+    src/psyq/libgpu.c
+    src/psyq/libgte.c
     src/psyq/libspu.c
     src/psyq/pad.c
     src/psyq/stubs.c
@@ -66,6 +83,12 @@ add_executable(crash2
 # among the game's
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11 -Wall -Wextra -fPIC>)
 target_include_directories(crash2 PRIVATE src)
+target_link_libraries(crash2 PRIVATE SDL3::SDL3-shared m)
+# libgte's functions run decomp's GTE model (include/gte.h): compiled as the game's C is
+set_source_files_properties(src/psyq/libgte.c PROPERTIES
+    INCLUDE_DIRECTORIES ${DECOMP}/include
+    COMPILE_OPTIONS "-std=gnu89;-w;-DGTE_MODEL;-include;${CMAKE_SOURCE_DIR}/src/host.h")
+set_target_properties(crash2 PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
 # At the PlayStation's RAM, 0x80000000 (src/host.h), and not position-independent: the game's data holds absolute
 # addresses. The BIOS's file calls go to src/psyq/bios_files.c
 target_link_options(crash2 PRIVATE -no-pie -Wl,-Ttext-segment=0x80000000 -Wl,-T,${CMAKE_SOURCE_DIR}/cmake/game_data.ld

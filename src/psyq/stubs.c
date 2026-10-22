@@ -2,7 +2,7 @@
 
 /* The PsyQ functions the game calls, each a stub that returns 0 and logs its first call.
  * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); libcd.c and
- * events.c, libcd.c, libspu.c and pad.c hold those written so far */
+ * events.c, libcd.c, libgpu.c, libgte.c, libspu.c and pad.c hold those written so far */
 #define PSYQ_STUB(name) \
     int name() { \
         static int called; \
@@ -41,26 +41,6 @@ PSYQ_STUB(startIntr)
 PSYQ_STUB(stopIntr)
 
 /* libgpu, and the internals its driver table in the data names (_addque to _sync) */
-PSYQ_STUB(AddPrim)
-PSYQ_STUB(DrawOTag)
-PSYQ_STUB(DrawPrim)
-PSYQ_STUB(DrawSync)
-PSYQ_STUB(GetGraphType)
-PSYQ_STUB(GetTPage)
-PSYQ_STUB(LoadImage)
-PSYQ_STUB(MoveImage)
-PSYQ_STUB(PutDispEnv)
-PSYQ_STUB(PutDrawEnv)
-PSYQ_STUB(ResetGraph)
-PSYQ_STUB(SetDefDispEnv)
-PSYQ_STUB(SetDefDrawEnv)
-PSYQ_STUB(SetDispMask)
-PSYQ_STUB(SetDrawMode)
-PSYQ_STUB(SetGraphDebug)
-PSYQ_STUB(SetPolyF4)
-PSYQ_STUB(SetSemiTrans)
-PSYQ_STUB(StoreImage)
-PSYQ_STUB(TermPrim)
 PSYQ_STUB(_addque)
 PSYQ_STUB(_addque2)
 PSYQ_STUB(_clr)
@@ -76,22 +56,6 @@ PSYQ_STUB(_param)
 PSYQ_STUB(_reset)
 PSYQ_STUB(_status)
 PSYQ_STUB(_sync)
-
-/* libgte */
-PSYQ_STUB(InitGeom)
-PSYQ_STUB(MulMatrix)
-PSYQ_STUB(ReadSZfifo3)
-PSYQ_STUB(RotTrans)
-PSYQ_STUB(RotTransPers)
-PSYQ_STUB(ScaleMatrix)
-PSYQ_STUB(SetColorMatrix)
-PSYQ_STUB(SetFarColor)
-PSYQ_STUB(SetGeomOffset)
-PSYQ_STUB(SetGeomScreen)
-PSYQ_STUB(SetRotMatrix)
-PSYQ_STUB(SetTransMatrix)
-PSYQ_STUB(TransMatrix)
-PSYQ_STUB(ratan2)
 
 /* libsnd and libspu, with the 15 functions of their objects the split leaves unnamed */
 PSYQ_STUB(SpuInitMalloc)

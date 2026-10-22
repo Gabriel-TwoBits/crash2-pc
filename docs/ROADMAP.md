@@ -86,8 +86,27 @@ matching"):
      10,041 runs agree: 669 of the 1,406 distinct blocks, by 900 paths. With `slt` made unsigned on purpose, 33 of 5,544
      differ.
    - **Left:** the blocks no demo level runs, with the levels played.
-6. **The picture.** The GTE's register moves on the host, the GPU's packets rasterized into VRAM, the display shown:
-   the title screen, compared with the PlayStation build in an emulator.
+6. **The picture (in progress).** The display in an SDL3 window, from a GPU in software.
+   - **GPU:** `src/gpu.c` holds the 1024×512 VRAM and runs the GP0 commands, from psx-spx: polygons (flat, Gouraud,
+     textured through 4- and 8-bit CLUTs or 15-bit texels, raw or modulated), lines and polylines, rectangles, fills,
+     VRAM copies and loads, the draw mode, texture window, drawing area, offset and mask. Semi-transparency, dithering
+     and the mask bit as the GPU does them.
+   - **libgpu:** `src/psyq/libgpu.c` walks the ordering table (24-bit links to KSEG0, decision 2), and sets the draw
+     and display environments from the game's structures: DISPENV's 0x14 bytes, DRAWENV's dtd at 0x16 and dfe at 0x17,
+     as `Gfx_Init` writes them.
+   - **libgte:** `src/psyq/libgte.c` writes the GTE's registers (rotation, translation, offset, distance, far colour,
+     light colours) and computes with decomp's GTE model, `RotTransPers` by its RTPS. `InitGeom` sets the retail
+     executable's values: ZSF3 0x155, ZSF4 0x100, H 1000, DQA -0x1062, DQB 0x1400000. Left as stubs, the projection
+     put every vertex at 0,0 and nothing showed.
+   - **Display:** `src/video.c` shows PutDispEnv's rectangle of VRAM at 4:3, paced to the NTSC frame (263 lines of
+     3,413 video cycles at 53.693175 MHz). `CRASH2_HEADLESS` runs without a window; `CRASH2_DUMP=DIR` writes the display
+     every `CRASH2_DUMP_EVERY` blanks as PPM, all of VRAM with `CRASH2_DUMP_VRAM`.
+   - **SDL3:** 3.2.10 from its release, pinned by SHA-256 and built as a shared library beside the program. Static, it
+     took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for.
+   - **Run:** the Naughty Dog logo over its nebula, then the title screen with its menu, as the PlayStation shows them
+     (decomp's `tools/run_game.py`, `title_again`, side by side). Headless with the rasterizer, about 180 vertical
+     blanks a second.
+   - **Left:** a frame-by-frame comparison with the PlayStation build on the game clock, the levels' pictures, speed.
 7. **Input, sound, saves.** The pad from SDL3's gamepads and keyboard, the SPU and libsnd's sequencer, the memory card
    in files.
 8. **Windows.** The same build for 32-bit Windows.
