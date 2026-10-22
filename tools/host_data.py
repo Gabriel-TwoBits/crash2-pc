@@ -62,7 +62,8 @@ def host(text):
 def main():
     if len(sys.argv) != 3:
         sys.exit(__doc__)
-    decomp, out = Path(sys.argv[1]), Path(sys.argv[2])
+    else:
+        decomp, out = Path(sys.argv[1]), Path(sys.argv[2])
     missing = [str(decomp / path) for path in DATA_FILES.values() if not (decomp / path).exists()]
     if missing:
         sys.exit(f"{', '.join(missing)} missing: split the decompilation first (README.md, \"Building\")")

@@ -3,6 +3,8 @@ project(Crash2PC LANGUAGES C ASM)
 
 if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
     message(FATAL_ERROR "crash2-pc is a 32-bit build: configure with -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake")
+else()
+    message(STATUS "32-bit build")
 endif()
 
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
@@ -13,6 +15,8 @@ set(SPLIT_DATA ${DECOMP}/asm/data/data.data.s ${DECOMP}/asm/data/bss.bss.s ${DEC
 foreach(file ${SPLIT_DATA})
     if(NOT EXISTS ${file})
         message(FATAL_ERROR "${file} is missing: split the decompilation first (README.md, \"Building\")")
+    else()
+        message(STATUS "Split data: ${file}")
     endif()
 endforeach()
 
