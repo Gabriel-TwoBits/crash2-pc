@@ -64,12 +64,24 @@ static unsigned char to_bcd(int value) {
     return (unsigned char)(((value / BCD_BASE) << BCD_SHIFT) | (value % BCD_BASE));
 }
 
+/* A path's last separator, '/' or Windows' '\\', or NULL */
+static const char *last_separator(const char *path) {
+    const char *slash = strrchr(path, '/');
+    const char *backslash = strrchr(path, '\\');
+
+    if (slash == NULL || (backslash != NULL && backslash > slash)) {
+        return backslash;
+    } else {
+        return slash;
+    }
+}
+
 /* The .bin a .cue names, beside it */
 static void open_cue(const char *cue) {
     FILE *file = fopen(cue, "r");
     char line[PATH_BYTES];
     char bin[PATH_BYTES];
-    const char *slash = strrchr(cue, '/');
+    const char *slash = last_separator(cue);
     int found = 0;
 
     if (file == NULL) {
