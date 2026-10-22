@@ -62,18 +62,25 @@ DESKTOP
 # The icon: a plain orange disc on black, nothing of the game's own art
 python3 - "$APPDIR/crash2-pc.png" "$ICON_SIZE" <<'ICON'
 import struct, sys, zlib
+ORANGE = bytes((0xF0, 0x80, 0x10, 0xFF))
+BLACK = bytes((0, 0, 0, 0xFF))
+RADIUS_FRACTION = 0.42
+PIXEL_CENTRE = 0.5
+NO_FILTER = 0
+# PNG's IHDR: 8 bits a channel, RGBA (colour type 6), deflate, no filter method, no interlace
+BIT_DEPTH, RGBA, DEFLATE, FILTER_METHOD, NO_INTERLACE = 8, 6, 0, 0, 0
 path, size = sys.argv[1], int(sys.argv[2])
-center, radius = size / 2, size * 0.42
+center, radius = size / 2, size * RADIUS_FRACTION
 rows = []
 for y in range(size):
-    row = bytearray([0])
+    row = bytearray([NO_FILTER])
     for x in range(size):
-        inside = (x + 0.5 - center) ** 2 + (y + 0.5 - center) ** 2 <= radius ** 2
-        row += bytes((0xF0, 0x80, 0x10, 0xFF)) if inside else bytes((0, 0, 0, 0xFF))
+        inside = (x + PIXEL_CENTRE - center) ** 2 + (y + PIXEL_CENTRE - center) ** 2 <= radius ** 2
+        row += ORANGE if inside else BLACK
     rows.append(bytes(row))
 def chunk(kind, data):
     return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
-header = struct.pack(">IIBBBBB", size, size, 8, 6, 0, 0, 0)
+header = struct.pack(">IIBBBBB", size, size, BIT_DEPTH, RGBA, DEFLATE, FILTER_METHOD, NO_INTERLACE)
 open(path, "wb").write(b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(b"".join(rows)))
                        + chunk(b"IEND", b""))
 ICON
