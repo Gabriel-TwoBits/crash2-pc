@@ -164,7 +164,7 @@ static void start(void) {
     } else {
         s_Directory = directory;
         snprintf(path, sizeof(path), "%s/game_frames.txt", directory);
-        s_Frames = fopen(path, "w");
+        s_Frames = fopen(path, "wb");
     }
     s_ShotCount = frame_list(getenv(SHOTS_VARIABLE), s_Shots);
     s_DumpCount = frame_list(getenv(DUMPS_VARIABLE), s_Dumps);

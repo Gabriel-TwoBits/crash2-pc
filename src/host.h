@@ -24,6 +24,11 @@ extern unsigned int g_HostGte[];
 #define GTE_STORE_DATA(reg, lvalue) (*(unsigned int *)&(lvalue) = g_HostGte[reg])
 #define GTE_LOAD_DATA(reg, lvalue) (g_HostGte[reg] = *(unsigned int *)&(lvalue))
 
+/* A C symbol's name for the assembler, with the target's prefix (32-bit Windows' underscore, none on Linux) */
+#define HOST_STRING(text) #text
+#define HOST_EXPANDED_STRING(text) HOST_STRING(text)
+#define ASM_SYMBOL(name) HOST_EXPANDED_STRING(__USER_LABEL_PREFIX__) #name
+
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 

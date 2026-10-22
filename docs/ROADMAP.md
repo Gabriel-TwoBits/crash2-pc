@@ -19,8 +19,8 @@ matching"):
 
    The program is linked there (`-Ttext-segment`), within the 8 MB `RAM_ADDRESS` tests for, and the decompilation's
    `RAM_BASE`, `RAM_ADDRESS` and `OT_LINK` hold as they are. The macros still give the host the scratchpad, the GTE's
-   registers and the native code. The cost: a 32-bit Windows process needs `LARGEADDRESSAWARE` and its image based at
-   0x80000000 (milestone 8).
+   registers and the native code. The cost on Windows: the game in a library at 0x80000000, which a
+   large-address-aware 32-bit process loads (milestone 8).
 3. **SDL3, and a software renderer.** SDL3 for the window, input and audio. The GPU's packets drawn by a software
    rasterizer into a 1024×512 VRAM, the PlayStation's own model, before any GPU backend. The SPU in software, under
    the retail executable's own libsnd and libspu, run from the player's disc on the interpreter (2026-10-22, in place
@@ -192,4 +192,29 @@ matching"):
      of the saved game's own state, which two PS1 runs save alike and the port's run, unpaced, saves otherwise, and the
      write-test frame, where the emulator's BIOS writes its buffer at `_card_clear`. Run again on that card, the port
      lists the save in Load Game.
-8. **Windows.** The same build for 32-bit Windows.
+8. **Windows (done under Wine).** The same build for 32-bit Windows, cross-compiled with MinGW-w64's GCC 14 in a
+   container (`tools/windows/`), run under Wine 10 in it.
+   - **The library at 0x80000000:** Wine reserves a 32-bit process's address space from 0x80000000 until the process
+     runs, so a program based there fails to map (`STATUS_CONFLICTING_ADDRESSES`); a library loaded once it runs maps
+     there. So the port is `crash2-game.dll`, based at 0x80000000 without ASLR, and `crash2.exe`, large-address-aware
+     with Linux's 8 MB of stack, loads it from its folder and calls its `Host_Main`. Should 0x80000000 be taken, Windows
+     moves the library and `main.c`'s check of the window stops it.
+   - **PE's layout:** each section starts on a page, so the game's data section is page-aligned (8 bytes in ELF); the
+     window's rest is a section to `ALIGN(0x800000)`, PE's ld keeping symbols relative to the image's base and refusing
+     ELF's arithmetic on `.`; COFF's `-fdata-sections` names a variable's section `.data$NAME`; COFF's assembler pads a
+     section's end to its alignment, so the split's data is 4-aligned there (8-aligned, it ended 4 bytes past the small
+     data's start). `tools/check_layout.py` (with MinGW's nm, the names' underscore dropped) finds all 936 data symbols
+     at their retail layout.
+   - **Names:** 32-bit Windows' C symbols take a leading underscore: `tools/host_data.py --coff` writes the split's
+     labels and words with it, and decomp's `ASM_SYMBOL` (`include/platform.h`, crash2-decomp 09646d0) gives
+     `RETAIL_ADDRESS`'s symbols the host's prefix. The split's data had been taking decomp's MIPS ELF `macro.inc` on
+     Linux too, its include path first: the build now puts tools/host_data.py's before it on both.
+   - **The system's:** the low RAM's faults and single steps come to a vectored exception handler (Linux: signals), the
+     window's rest is made unreadable by `VirtualProtect`, the heap is 64 KB-aligned at start-up (COFF aligns a variable
+     to 8 KB at most), BSD's `bzero` and `bcopy` are the host's, the logs are written in binary, and a `.cue`'s path may
+     use backslashes.
+   - **Against the Linux build:** under Wine, headless, the demo's 6,000 game frames and the memory-card run's 3,500
+     give the same frames' hashes, SPU writes and card, and the native code agrees with Unicorn; in a window on Xvfb,
+     the first 600 game frames' hashes are the same. The zip (`tools/windows/build.sh`), unpacked, plays the same
+     frames.
+   - **Left:** Windows itself, which no machine here runs: the window, sound and gamepad through SDL3 there.

@@ -1,0 +1,13 @@
+# The Windows build's tools, kept off the host: MinGW-w64's 32-bit GCC to cross-compile crash2.exe, CMake, Ninja and
+# Python for the build, and 32-bit Wine to run the result, headless or in a window on Xvfb's virtual display
+# (tools/windows/build.sh, tools/windows/run.sh).
+# Debian trixie, pinned by digest
+FROM docker.io/library/debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
+
+RUN dpkg --add-architecture i386 \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        ca-certificates cmake ninja-build python3 \
+        gcc-mingw-w64-i686 g++-mingw-w64-i686 binutils-mingw-w64-i686 \
+        wine wine32:i386 xvfb xauth \
+    && rm -rf /var/lib/apt/lists/*

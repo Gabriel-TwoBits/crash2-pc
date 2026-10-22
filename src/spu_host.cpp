@@ -42,7 +42,7 @@ extern "C" void Spu_Init(void)
   }
   else
   {
-    s_Log = fopen(log, "w");
+    s_Log = fopen(log, "wb");
   }
   if (s_Log == nullptr)
   {

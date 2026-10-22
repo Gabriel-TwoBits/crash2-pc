@@ -1,5 +1,10 @@
+#include <stdint.h>
 #include <stdlib.h>
+#ifdef _WIN32
+#include <windows.h>
+#else
 #include <sys/mman.h>
+#endif
 
 #include "host.h"
 #include "host_log.h"
@@ -24,6 +29,14 @@
 #define HEAP_ALIGNMENT 0x10000
 #define RETAIL_HEAP_BASE 0x8006F1F0u
 #define HEAP_PLACE (RETAIL_HEAP_BASE & (HEAP_ALIGNMENT - 1))
+#ifdef _WIN32
+/* COFF aligns a variable to 8 KB at most: the heap's area holds a 64 KB alignment's slack instead */
+#define HEAP_AREA_ALIGNMENT 1
+#define HEAP_AREA_SLACK HEAP_ALIGNMENT
+#else
+#define HEAP_AREA_ALIGNMENT HEAP_ALIGNMENT
+#define HEAP_AREA_SLACK 0
+#endif
 
 /* The heap's base and size, the start-up's words libsn's InitHeap reads */
 extern unsigned char *D_8005CB28;
@@ -31,12 +44,25 @@ extern unsigned int D_8005CB2C;
 void func_8001144C(int *start, unsigned int bytes);
 int Game_Main(void);
 
-/* GNU ld's: the program's first address */
+/* The linker's: the program's first address */
+#ifdef _WIN32
+extern IMAGE_DOS_HEADER __ImageBase;
+#define PROGRAM_START ((unsigned int)(uintptr_t)&__ImageBase)
+#else
 extern char __executable_start[];
+#define PROGRAM_START ((unsigned int)(uintptr_t)__executable_start)
+#endif
 
 unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(SCRATCHPAD_BYTES)));
-static unsigned char s_HeapArea[HEAP_PLACE + HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(HEAP_ALIGNMENT)));
-unsigned char *const g_HostHeap = s_HeapArea + HEAP_PLACE;
+static unsigned char s_HeapArea[HEAP_AREA_SLACK + HEAP_PLACE + HEAP_BYTES + HEAP_SLACK_BYTES]
+    __attribute__((aligned(HEAP_AREA_ALIGNMENT)));
+
+/* The heap: HEAP_PLACE past the area's first 64 KB boundary, its start where the area is aligned */
+static unsigned char *heap_base(void) {
+    uintptr_t boundary = ((uintptr_t)s_HeapArea + HEAP_ALIGNMENT - 1) & ~(uintptr_t)(HEAP_ALIGNMENT - 1);
+
+    return (unsigned char *)boundary + HEAP_PLACE;
+}
 
 /* The linker's window reservation past the program (cmake/game_data.ld) */
 extern char __window_rest_start[];
@@ -44,15 +70,25 @@ extern char __window_rest_end[];
 
 /* The program in the window, the window's rest unreadable: the game's access past its image faults (low_ram.c
  * reports it) */
+static int protect(void *start, unsigned int bytes) {
+#ifdef _WIN32
+    DWORD old;
+
+    return VirtualProtect(start, bytes, PAGE_NOACCESS, &old) ? 0 : -1;
+#else
+    return mprotect(start, bytes, PROT_NONE);
+#endif
+}
+
 static void check_window(void) {
-    unsigned int first = (unsigned int)__executable_start;
-    unsigned int last = (unsigned int)__window_rest_start;
+    unsigned int first = PROGRAM_START;
+    unsigned int last = (unsigned int)(uintptr_t)__window_rest_start;
     unsigned int rest = (unsigned int)(__window_rest_end - __window_rest_start);
 
-    if (first < RAM_WINDOW || (unsigned int)__window_rest_end != RAM_WINDOW + RAM_WINDOW_BYTES) {
+    if (first < RAM_WINDOW || (unsigned int)(uintptr_t)__window_rest_end != RAM_WINDOW + RAM_WINDOW_BYTES) {
         Host_Fatal("the program spans 0x%08X to 0x%08X, outside the 8 MB window at 0x%08X (src/host.h)", first, last,
                    RAM_WINDOW);
-    } else if (mprotect(__window_rest_start, rest, PROT_NONE) != 0) {
+    } else if (protect(__window_rest_start, rest) != 0) {
         Host_Fatal("can't protect the window from 0x%08X", last);
     } else {
         Host_Log("the program spans 0x%08X to 0x%08X, the window reserved past it", first, last);
@@ -62,7 +98,12 @@ static void check_window(void) {
 /* The disc image: the first argument, else CRASH2_DISC */
 #define DISC_VARIABLE "CRASH2_DISC"
 
+#ifdef _WIN32
+/* On Windows the port is a library at 0x80000000 that crash2.exe loads and enters here (src/launcher.c) */
+__declspec(dllexport) int Host_Main(int argc, char **argv) {
+#else
 int main(int argc, char **argv) {
+#endif
     const char *disc = argc > 1 ? argv[1] : getenv(DISC_VARIABLE);
 
     check_window();
@@ -74,8 +115,8 @@ int main(int argc, char **argv) {
         Host_OpenDisc(disc);
         Host_SoundStart();
     }
-    D_8005CB28 = g_HostHeap;
+    D_8005CB28 = heap_base();
     D_8005CB2C = HEAP_BYTES;
-    func_8001144C((int *)(g_HostHeap + HEAP_START_OFFSET), HEAP_BYTES);
+    func_8001144C((int *)(heap_base() + HEAP_START_OFFSET), HEAP_BYTES);
     return Game_Main();
 }

@@ -1,3 +1,4 @@
 build/
+build-windows/
 .venv/
 __pycache__/

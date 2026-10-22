@@ -3,11 +3,13 @@
 and bss (0x8005B198 to 0x8006F1F0) at its retail address plus one offset. The game's C reads across its variables'
 bounds (a word past one being its neighbour's), so the host keeps their order and spacing.
 
-    python tools/check_layout.py PROGRAM SYMBOL_ADDRS
+    python tools/check_layout.py PROGRAM SYMBOL_ADDRS [--nm NM] [--underscore]
 
 PROGRAM is the linked program, SYMBOL_ADDRS the decompilation's config/symbol_addrs.txt; a D_XXXXXXXX symbol's address
-is its name.
+is its name. --nm names the nm that reads the program (32-bit Windows': i686-w64-mingw32-nm); --underscore reads its C
+symbols without the leading underscore 32-bit Windows gives them.
 """
+import argparse
 import re
 import subprocess
 import sys
@@ -34,12 +36,15 @@ def retail_addresses(symbol_addrs):
 
 
 def main():
-    if len(sys.argv) != 3:
-        sys.exit(__doc__)
-    else:
-        program, symbol_addrs = Path(sys.argv[1]), Path(sys.argv[2])
-    named = retail_addresses(symbol_addrs)
-    output = subprocess.run(["nm", str(program)], check=True, capture_output=True, text=True).stdout
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("program", type=Path)
+    parser.add_argument("symbol_addrs", type=Path)
+    parser.add_argument("--nm", default="nm")
+    parser.add_argument("--underscore", action="store_true")
+    arguments = parser.parse_args()
+    program = arguments.program
+    named = retail_addresses(arguments.symbol_addrs)
+    output = subprocess.run([arguments.nm, str(program)], check=True, capture_output=True, text=True).stdout
     offsets = {}
     for line in output.splitlines():
         entry = NM_LINE.match(line)
@@ -47,6 +52,11 @@ def main():
             continue
         else:
             host, name = int(entry.group(1), 16), entry.group(2)
+        if arguments.underscore and name.startswith("_"):
+            name = name[1:]
+        else:
+            # The name as nm gives it
+            pass
         by_name = ADDRESS_NAMED.match(name)
         if by_name is not None:
             retail = int(by_name.group(1), 16)

@@ -49,6 +49,20 @@ build/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 
 What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.
 
+### Windows
+
+The Windows build is cross-compiled on Linux, in a container that holds its tools (MinGW-w64's 32-bit GCC, CMake and
+Wine), so nothing is installed on the machine: with podman or docker, once the decompilation is split as above,
+
+```sh
+tools/windows/build.sh
+```
+
+makes `build-windows/crash2-pc-windows.zip`: `crash2.exe`, `crash2-game.dll`, `SDL3.dll` and the licences. On Windows,
+drop the disc image's `.cue` onto `crash2.exe`, or run `crash2.exe "path\to\the.cue"`. It needs 64-bit Windows: the
+game sits at 0x80000000, which only a 64-bit system gives a 32-bit program. Tried under Wine so far, where it plays
+the PlayStation's frames as the Linux build does, not on Windows itself.
+
 ## Playing
 
 | PlayStation | Keyboard | Gamepad |
@@ -63,8 +77,9 @@ What the split and the build make from your executable stays in `decomp/` (ignor
 | L1, R1 | A, S | shoulders |
 | L2, R2 | Q, W | triggers |
 
-The memory card is `memcard1.mcd` in SDL's preference folder (on Linux, under `~/.local/share`): a 128 KB card image,
-the format emulators and card tools use, so a save moves between them. `CRASH2_MEMORY_CARD=FILE` uses another.
+The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
+`%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.
+`CRASH2_MEMORY_CARD=FILE` uses another.
 
 ## How it's made: AI-assisted
 

@@ -1,3 +1,20 @@
+#ifdef _WIN32
+#include <stdlib.h>
+
+#include "host_log.h"
+#include "sampler.h"
+
+#define SAMPLE_VARIABLE "CRASH2_SAMPLE"
+
+/* TRADEOFF: Linux's profiling timer only; on Windows a debugging aid less */
+void Host_StartSampler(void) {
+    if (getenv(SAMPLE_VARIABLE) != NULL) {
+        Host_Log("%s: no sampler on Windows", SAMPLE_VARIABLE);
+    } else {
+        /* Not asked for */
+    }
+}
+#else
 #define _GNU_SOURCE
 #include <signal.h>
 #include <stdint.h>
@@ -114,3 +131,4 @@ void Host_StartSampler(void) {
         setitimer(ITIMER_PROF, &timer, NULL);
     }
 }
+#endif

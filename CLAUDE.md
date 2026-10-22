@@ -51,6 +51,10 @@ is shows it by the same `game_frames.txt` hashes as before.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.
+- Windows: `tools/windows/build.sh` builds `build-windows/` and its zip in the container
+  (`tools/windows/Containerfile`); `tools/windows/run.sh [--window] DISC.cue OUT NAME=VALUE...` runs it under Wine,
+  `Z:/out` being OUT. The Windows build's `game_frames.txt`, SPU log and card match the Linux build's to the byte on
+  the same run; a change to the host's code shows it on both.
 - Debugging: `CRASH2_SAMPLE=1` samples where the time goes; a fatal error aborts, and gdb reads its core dump
   (`coredumpctl dump`). A live gdb can't follow the game past the low RAM's single steps (`src/low_ram.c`).
 

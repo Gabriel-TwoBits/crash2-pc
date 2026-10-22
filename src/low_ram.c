@@ -1,8 +1,12 @@
+#ifdef _WIN32
+#include <windows.h>
+#else
 #define _GNU_SOURCE
 #include <signal.h>
+#include <ucontext.h>
+#endif
 #include <stdint.h>
 #include <string.h>
-#include <ucontext.h>
 
 #include "host_log.h"
 #include "low_ram.h"
@@ -10,7 +14,8 @@
 /* The PlayStation reads and writes its first 64 KB, the kernel's RAM, where the game's null pointers and their fields
  * land (Gool_ResolveRef's null operand, read by Gool_OpVector). Linux maps no page there, so an access faults: the
  * handler finds the faulting instruction's base (or index) register, points it at s_LowRam by as much, runs that one
- * instruction (the trap flag), and puts the register back unless the instruction loaded into it.
+ * instruction (the trap flag), and puts the register back unless the instruction loaded into it. Linux reports the
+ * fault and the step by signals, Windows by exceptions, to a vectored handler.
  * TRADEOFF: s_LowRam starts zeroed where the PlayStation holds what its BIOS left; an access with no register in its
  * address, or above 64 KB, still stops the program */
 
@@ -66,10 +71,17 @@
 #define SIB_NO_BASE 5
 #define NO_REGISTER -1
 
+#define GENERAL_REGISTERS 8
+
 static unsigned char s_LowRam[LOW_RAM_BYTES] __attribute__((aligned(16)));
 
-/* ModRM's register numbers as the signal context holds them */
-static const int s_Gregs[] = {REG_EAX, REG_ECX, REG_EDX, REG_EBX, REG_ESP, REG_EBP, REG_ESI, REG_EDI};
+/* The faulting thread's state as either system hands it over: the instruction's address, the general registers by
+ * ModRM's numbers, the flags */
+typedef struct {
+    uint32_t eip;
+    uint32_t *registers[GENERAL_REGISTERS];
+    uint32_t *flags;
+} Cpu;
 
 /* The instruction being stepped: the register moved, by how much, and the one it writes */
 static int s_Moved = NO_REGISTER;
@@ -141,11 +153,9 @@ static void log_site(uint32_t eip, uint32_t address) {
     }
 }
 
-static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) {
-    ucontext_t *context = context_pointer;
-    greg_t *gregs = context->uc_mcontext.gregs;
-    uint32_t address = (uint32_t)(uintptr_t)info->si_addr;
-    const unsigned char *code = (const unsigned char *)(uintptr_t)gregs[REG_EIP];
+/* A fault on low RAM: the instruction's address register moved onto s_LowRam, the trap flag set */
+static void on_fault(Cpu *cpu, uint32_t address) {
+    const unsigned char *code = (const unsigned char *)(uintptr_t)cpu->eip;
     int two_byte = 0;
     unsigned char opcode;
     unsigned char modrm;
@@ -153,16 +163,15 @@ static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) 
     int index = NO_REGISTER;
     int scale = 0;
 
-    (void)signal_number;
     if (address >= LOW_RAM_BYTES || s_Moved != NO_REGISTER) {
-        Host_Fatal("segmentation fault at 0x%08X, instruction 0x%08X", address, (uint32_t)gregs[REG_EIP]);
+        Host_Fatal("segmentation fault at 0x%08X, instruction 0x%08X", address, cpu->eip);
     } else {
         while (is_prefix(*code)) {
             code++;
         }
     }
     if (*code == PREFIX_ADDRESS_SIZE) {
-        Host_Fatal("low RAM: 16-bit addressing at 0x%08X", (uint32_t)gregs[REG_EIP]);
+        Host_Fatal("low RAM: 16-bit addressing at 0x%08X", cpu->eip);
     } else if (*code == TWO_BYTE_ESCAPE) {
         two_byte = 1;
         opcode = code[1];
@@ -174,7 +183,7 @@ static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) 
         code += MODRM_ONE_BYTE + 1;
     }
     if (MODRM_MOD(modrm) == MOD_REGISTER || (MODRM_MOD(modrm) == MOD_INDIRECT && MODRM_RM(modrm) == RM_DISP32)) {
-        Host_Fatal("low RAM: no register in the address of 0x%08X's access to 0x%04X", (uint32_t)gregs[REG_EIP],
+        Host_Fatal("low RAM: no register in the address of 0x%08X's access to 0x%04X", cpu->eip,
                    address);
     } else if (MODRM_RM(modrm) == RM_SIB) {
         unsigned char sib = *code;
@@ -198,9 +207,9 @@ static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) 
     } else if (index != NO_REGISTER && scale == 0) {
         s_Moved = index;
     } else {
-        Host_Fatal("low RAM: no register to move in 0x%08X's address", (uint32_t)gregs[REG_EIP]);
+        Host_Fatal("low RAM: no register to move in 0x%08X's address", cpu->eip);
     }
-    log_site((uint32_t)gregs[REG_EIP], address);
+    log_site(cpu->eip, address);
     s_Written = NO_REGISTER;
     if (!uses_reg_field(opcode, two_byte) || MODRM_REG(modrm) != s_Moved) {
         /* The moved register is only the address's */
@@ -209,29 +218,80 @@ static void on_fault(int signal_number, siginfo_t *info, void *context_pointer) 
     } else if (adds_into_register(opcode, two_byte)) {
         /* Put back after the step as an address register would be */
     } else {
-        Host_Fatal("low RAM: 0x%08X uses its address register as an operand too", (uint32_t)gregs[REG_EIP]);
+        Host_Fatal("low RAM: 0x%08X uses its address register as an operand too", cpu->eip);
     }
     s_Delta = (uint32_t)(uintptr_t)s_LowRam;
-    gregs[s_Gregs[s_Moved]] += s_Delta;
-    gregs[REG_EFL] |= TRAP_FLAG;
+    *cpu->registers[s_Moved] += s_Delta;
+    *cpu->flags |= TRAP_FLAG;
 }
 
 /* After the stepped instruction: the moved register back, unless the instruction loaded into it */
-static void on_step(int signal_number, siginfo_t *info, void *context_pointer) {
-    ucontext_t *context = context_pointer;
-    greg_t *gregs = context->uc_mcontext.gregs;
-
-    (void)signal_number;
-    (void)info;
+static void on_step(Cpu *cpu) {
     if (s_Moved == NO_REGISTER) {
-        Host_Fatal("trap at 0x%08X with no low RAM access stepping", (uint32_t)gregs[REG_EIP]);
+        Host_Fatal("trap at 0x%08X with no low RAM access stepping", cpu->eip);
     } else if (s_Written != s_Moved) {
-        gregs[s_Gregs[s_Moved]] -= s_Delta;
+        *cpu->registers[s_Moved] -= s_Delta;
     } else {
         /* The instruction loaded the register: its value stands */
     }
-    gregs[REG_EFL] &= ~TRAP_FLAG;
+    *cpu->flags &= ~TRAP_FLAG;
     s_Moved = NO_REGISTER;
+}
+
+#ifdef _WIN32
+/* A fault outside low RAM, or a step not this handler's, goes on to the system's handlers */
+static LONG CALLBACK on_exception(EXCEPTION_POINTERS *pointers) {
+    const EXCEPTION_RECORD *record = pointers->ExceptionRecord;
+    CONTEXT *context = pointers->ContextRecord;
+    Cpu cpu = {(uint32_t)context->Eip,
+               {(uint32_t *)&context->Eax, (uint32_t *)&context->Ecx, (uint32_t *)&context->Edx,
+                (uint32_t *)&context->Ebx, (uint32_t *)&context->Esp, (uint32_t *)&context->Ebp,
+                (uint32_t *)&context->Esi, (uint32_t *)&context->Edi},
+               (uint32_t *)&context->EFlags};
+
+    if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->ExceptionInformation[1] < LOW_RAM_BYTES) {
+        on_fault(&cpu, (uint32_t)record->ExceptionInformation[1]);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    } else if (record->ExceptionCode == EXCEPTION_SINGLE_STEP && s_Moved != NO_REGISTER) {
+        on_step(&cpu);
+        return EXCEPTION_CONTINUE_EXECUTION;
+    } else {
+        return EXCEPTION_CONTINUE_SEARCH;
+    }
+}
+
+void Host_InstallLowRam(void) {
+    if (AddVectoredExceptionHandler(1, on_exception) == NULL) {
+        Host_Fatal("can't install the low RAM's exception handler");
+    } else {
+        /* Installed first in the handlers' chain */
+    }
+}
+#else
+static Cpu cpu_of(void *context_pointer) {
+    greg_t *gregs = ((ucontext_t *)context_pointer)->uc_mcontext.gregs;
+    Cpu cpu = {(uint32_t)gregs[REG_EIP],
+               {(uint32_t *)&gregs[REG_EAX], (uint32_t *)&gregs[REG_ECX], (uint32_t *)&gregs[REG_EDX],
+                (uint32_t *)&gregs[REG_EBX], (uint32_t *)&gregs[REG_ESP], (uint32_t *)&gregs[REG_EBP],
+                (uint32_t *)&gregs[REG_ESI], (uint32_t *)&gregs[REG_EDI]},
+               (uint32_t *)&gregs[REG_EFL]};
+
+    return cpu;
+}
+
+static void on_segmentation_fault(int signal_number, siginfo_t *info, void *context_pointer) {
+    Cpu cpu = cpu_of(context_pointer);
+
+    (void)signal_number;
+    on_fault(&cpu, (uint32_t)(uintptr_t)info->si_addr);
+}
+
+static void on_trap(int signal_number, siginfo_t *info, void *context_pointer) {
+    Cpu cpu = cpu_of(context_pointer);
+
+    (void)signal_number;
+    (void)info;
+    on_step(&cpu);
 }
 
 void Host_InstallLowRam(void) {
@@ -240,8 +300,9 @@ void Host_InstallLowRam(void) {
     memset(&action, 0, sizeof(action));
     action.sa_flags = SA_SIGINFO;
     sigemptyset(&action.sa_mask);
-    action.sa_sigaction = on_fault;
+    action.sa_sigaction = on_segmentation_fault;
     sigaction(SIGSEGV, &action, NULL);
-    action.sa_sigaction = on_step;
+    action.sa_sigaction = on_trap;
     sigaction(SIGTRAP, &action, NULL);
 }
+#endif
