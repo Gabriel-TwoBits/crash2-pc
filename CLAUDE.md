@@ -34,6 +34,11 @@ for 32-bit x86: Debian's i386 package conflicts with backports' Mesa.
 - `build/crash2 DISC.cue` runs headless; `tools/check_layout.py` checks the game's data layout after each link.
 - The native code's test: `CRASH2_NATIVE_TRACE=build/native.trace build/crash2 DISC.cue` for a minute, then
   `.venv/bin/python tools/check_native.py build/native.trace` (`.venv` from `tools/requirements.txt`).
+- Against the PS1: decomp's `tools/run_game.py DISC.cue --schedule demo --against retail --dump N` (in the
+  decompilation, one run at a time) dumps the PS1's RAM at game frame N into `build/run_game/retail/ram_N.bin`. The
+  port's `CRASH2_HEADLESS=1 CRASH2_GAME_CLOCK=DIR CRASH2_GAME_CLOCK_LAST=N CRASH2_GAME_CLOCK_DUMPS=N build/crash2
+  DISC.cue` dumps its own, and `tools/compare_ram.py PS1.bin DIR/ram_N.bin build/crash2 decomp` names the variables
+  that differ.
 - Debugging: `CRASH2_SAMPLE=1` samples where the time goes; a fatal error aborts, and gdb reads its core dump
   (`coredumpctl dump`). A live gdb can't follow the game past the low RAM's single steps (`src/low_ram.c`).
 
