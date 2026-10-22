@@ -39,6 +39,9 @@ for 32-bit x86: Debian's i386 package conflicts with backports' Mesa.
   port's `CRASH2_HEADLESS=1 CRASH2_GAME_CLOCK=DIR CRASH2_GAME_CLOCK_LAST=N CRASH2_GAME_CLOCK_DUMPS=N build/crash2
   DISC.cue` dumps its own, and `tools/compare_ram.py PS1.bin DIR/ram_N.bin build/crash2 decomp` names the variables
   that differ.
+- The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
+  has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
+  their notes and lists each note missing on one side or differing.
 - Debugging: `CRASH2_SAMPLE=1` samples where the time goes; a fatal error aborts, and gdb reads its core dump
   (`coredumpctl dump`). A live gdb can't follow the game past the low RAM's single steps (`src/low_ram.c`).
 

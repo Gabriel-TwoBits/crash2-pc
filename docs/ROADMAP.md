@@ -151,8 +151,8 @@ matching"):
      (0x8004FE38), by their arguments and uses in decomp's `src/game/800324A8.c` and `800123F0.c`; the structures'
      layouts from how the game fills them. The reverb's presets are psx-spx's. The game's own sound effects go
      through them.
-   - **Music (done):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats, ticked at
-     each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below `SsSetReservedVoice`'s
+   - **Music (in progress):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats, ticked
+     at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below `SsSetReservedVoice`'s
      count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4) and SsSepSetDecrescendo
      (0x80052B4C) by their arguments and uses. Two facts of the formats psx-spx leaves out: the VAB's halfword at 0x12
      is its programs' count itself, not less one (the title's VAB has 13 programs, and its 30 VAG sizes, read after 13
@@ -164,6 +164,10 @@ matching"):
      tone's byte shifted right 3). The 327 notes then start on the same samples at the same ticks, 323 at the same pitch
      and the PS1's other 4 one below, their volumes within 2 of the PS1's. In the second piece some notes start a tick
      later than the PS1's.
-   - **Left:** the programs', channels' and sequences' volumes and pans, the pitch bend's range and the tick's rounding,
-     which the measured music doesn't exercise or shows a tick apart; the memory card in files.
+   - **Left:** the music against the PS1's note by note. `tools/compare_spu.py` on 12,000 vsyncs of the PS1 (intro,
+     title, demos) against 8,000 of the port: of the notes aligned, 711 last another length, most cut on the PS1 when
+     its libsnd takes their voice for a new note (its 16 voices all busy, it steals by a rule of its own); 69 start a
+     blank apart, the tick's rounding alternating them; a tone's volume over 127 gives the PS1 a voice volume past
+     0x3FFF, which the port's clamps. The programs', channels' and sequences' volumes and pans and the pitch bend's
+     range aren't measured. Then the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.
