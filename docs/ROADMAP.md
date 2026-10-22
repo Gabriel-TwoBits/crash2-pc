@@ -217,4 +217,11 @@ matching"):
      give the same frames' hashes, SPU writes and card, and the native code agrees with Unicorn; in a window on Xvfb,
      the first 600 game frames' hashes are the same. The zip (`tools/windows/build.sh`), unpacked, plays the same
      frames.
-   - **Left:** Windows itself, which no machine here runs: the window, sound and gamepad through SDL3 there.
+   - **Linux's AppImage:** built in a container too (`tools/linux/`), SDL3 with X11, Wayland, PulseAudio and ALSA. The
+     program is 32-bit, which a 64-bit system rarely has libraries for, its C library included: the AppImage carries
+     every library it loads (39, from 32-bit Debian trixie, 15 MB) and AppRun starts the program on the C library's own
+     loader with them; SDL3 draws in software where it finds no OpenGL. In a 64-bit Debian with no 32-bit library, the
+     demo's 6,000 game frames and the memory-card run give the same frames' hashes, SPU writes and card as the build's
+     own runs, and in a window on Xvfb the first 600 game frames too.
+   - **Left:** Windows itself, which no machine here runs, and the AppImage on a desktop: their windows, sound and
+     gamepads through SDL3.

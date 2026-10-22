@@ -49,6 +49,13 @@ build/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 
 What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.
 
+### Linux's AppImage
+
+`tools/linux/build.sh` builds the same in a container, with podman or docker, into
+`build-linux/crash2-pc-linux.AppImage`: the 32-bit program with every library it loads, its C library included, so it
+runs on a 64-bit Linux with no 32-bit library installed, X11 or Wayland, PulseAudio or PipeWire. Run it with the disc
+image: `./crash2-pc-linux.AppImage "path/to/the.cue"`.
+
 ### Windows
 
 The Windows build is cross-compiled on Linux, in a container that holds its tools (MinGW-w64's 32-bit GCC, CMake and

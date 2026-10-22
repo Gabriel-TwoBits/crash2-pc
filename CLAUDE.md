@@ -51,6 +51,9 @@ is shows it by the same `game_frames.txt` hashes as before.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.
+- The AppImage: `tools/linux/build.sh` builds `build-linux/` and `build-linux/crash2-pc-linux.AppImage` in the container
+  (`tools/linux/Containerfile`); `tools/linux/run.sh [--window] DISC.cue OUT NAME=VALUE...` runs it in a 64-bit
+  system with no 32-bit library, `/out` being OUT, for the same checks.
 - Windows: `tools/windows/build.sh` builds `build-windows/` and its zip in the container
   (`tools/windows/Containerfile`); `tools/windows/run.sh [--window] DISC.cue OUT NAME=VALUE...` runs it under Wine,
   `Z:/out` being OUT. The Windows build's `game_frames.txt`, SPU log and card match the Linux build's to the byte on
