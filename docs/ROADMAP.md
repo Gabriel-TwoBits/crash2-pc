@@ -170,4 +170,11 @@ matching"):
      blank apart, the tick's rounding alternating them; a tone's volume over 127 gives the PS1 a voice volume past
      0x3FFF, which the port's clamps. The programs', channels' and sequences' volumes and pans and the pitch bend's
      range aren't measured. Then the memory card in files.
+   - **Next (decided 2026-10-22):** run the disc's own libsnd and libspu, their MIPS code from the player's disc as the
+     game's data is, on `src/native.c`'s interpreter, so the music is the PS1's by construction: the interpreter
+     extended to the instructions they use (lwl/lwr/swl/swr, mult/div, the rest of the loads and stores), libsnd's data
+     reached at its retail addresses (the port's data keeps their layout, tools/check_layout.py), the SPU's registers
+     and its DMA channel on the host's SPU, the OS calls they make (VSyncCallback, critical sections, root counters) on
+     the host's, and the game's calls into them through the interpreter. `src/psyq/libsnd.c` then goes;
+     `tools/compare_spu.py` checks it.
 8. **Windows.** The same build for 32-bit Windows.
