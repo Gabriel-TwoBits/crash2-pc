@@ -42,6 +42,16 @@ add_custom_command(
     COMMENT "Rewriting the split's data for the host")
 add_custom_target(host_data DEPENDS ${HOST_DATA} ${HOST_ASM}/macro.inc)
 
+# The libraries' functions at their retail addresses, for the interpreter to run them from the disc (src/sdk.c)
+file(GLOB_RECURSE SDK_ASM CONFIGURE_DEPENDS ${DECOMP}/asm/sdk/*.s)
+set(SDK_SYMBOLS ${CMAKE_BINARY_DIR}/sdk/sdk_symbols.h)
+add_custom_command(
+    OUTPUT ${SDK_SYMBOLS}
+    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/sdk_symbols.py ${DECOMP} ${SDK_SYMBOLS}
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/sdk_symbols.py ${SDK_ASM}
+    COMMENT "Listing the libraries' retail addresses")
+set_source_files_properties(src/sdk.c PROPERTIES OBJECT_DEPENDS ${SDK_SYMBOLS})
+
 # The game's C, as the decompilation's equivalent build has it, with the host's platform macros (src/host.h)
 # The retail image's order, which the link keeps (tools/check_layout.py): the split's data, each game file's small
 # data, the bss (tools/host_data.py puts it in .data, so the host's own data can't come between)
@@ -74,6 +84,8 @@ add_executable(crash2
     src/gte.c
     src/low_ram.c
     src/sampler.c
+    src/mips.c
+    src/sdk.c
     src/native.c
     src/handwritten.c
     src/video.c
@@ -81,8 +93,6 @@ add_executable(crash2
     src/psyq/libcd.c
     src/psyq/libgpu.c
     src/psyq/libgte.c
-    src/psyq/libsnd.c
-    src/psyq/libspu.c
     src/psyq/pad.c
     src/psyq/stubs.c
     src/psyq/bios_files.c
@@ -90,7 +100,7 @@ add_executable(crash2
 # Position-independent code: the C library's variables (stderr) stay in it, where a copy in the program's bss would sit
 # among the game's
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:C>:-std=gnu11 -Wall -Wextra -fPIC>)
-target_include_directories(crash2 PRIVATE src)
+target_include_directories(crash2 PRIVATE src ${CMAKE_BINARY_DIR}/sdk)
 # SwanStation's rasterizer (third_party/swanstation/README.md), C++17 as it is written
 target_include_directories(crash2 PRIVATE src/spu_shim third_party/swanstation third_party/swanstation/core)
 target_compile_options(crash2 PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++17 -fPIC>)

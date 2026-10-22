@@ -2,7 +2,6 @@
 
 #include "audio.h"
 #include "host_log.h"
-#include "psyq/host_psyq.h"
 #include "spu_host.h"
 
 /* The SPU's output: SwanStation's SPU run for each frame's CPU cycles (spu_host.h), its 44.1 kHz stereo frames to an
@@ -37,7 +36,6 @@ void Host_AudioStart(void) {
 void Host_AudioFrame(uint32_t cycles) {
     int bytes;
 
-    Host_SpuStart();
     Spu_Run(cycles);
     bytes = (int)(Spu_FrameCount() * SPU_CHANNELS * sizeof(int16_t));
     if (s_Stream != NULL && SDL_GetAudioStreamQueued(s_Stream) < MAX_QUEUED_BYTES) {

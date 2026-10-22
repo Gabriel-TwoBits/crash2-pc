@@ -21,7 +21,9 @@ is no memory card yet. The plan and its milestones are in [docs/ROADMAP.md](docs
 The decompilation is a git submodule (`decomp/`), pinned at a commit, and the only source of the game's C: this
 repository holds no copy of it. A change the port needs in that C is made in the decompilation, where the PlayStation
 executable must stay byte for byte the same, and the submodule moves to it. So the PlayStation build stays the reference
-the port is compared against.
+the port is compared against. The sound libraries, libsnd and libspu, are the one part run as the executable's machine
+code: read from your disc image at start-up, on an interpreter of the PlayStation's CPU, so the music and the sound
+effects are the PlayStation's own.
 
 ## Building
 

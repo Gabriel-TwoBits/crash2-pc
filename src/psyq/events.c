@@ -29,14 +29,21 @@
 #define EVENTS 16
 #define EVENT_FAILURE -1
 #define EVENT_SUCCESS 1
+/* An event's mode: its handler runs when it is delivered (EvMdINTR), or it waits for TestEvent or WaitEvent
+ * (EvMdNOINTR); a root counter's interrupt is EvSpINT */
+#define EVENT_MODE_INTERRUPT 0x1000
+#define EVENT_SPEC_INTERRUPT 2
 
+/* An event's handler is the host's (the game's C) or the retail sound libraries' code (sdk.c) */
 typedef struct {
     unsigned int descriptor;
     int spec;
     int mode;
     void (*handler)(void);
+    unsigned int retail_handler;
     int open;
     int enabled;
+    int ready;
 } Event;
 
 static Event s_Events[EVENTS];
@@ -58,7 +65,7 @@ static Event *event_of(int handle) {
     }
 }
 
-int OpenEvent(unsigned int descriptor, int spec, int mode, void (*handler)(void)) {
+static int open_event(unsigned int descriptor, int spec, int mode, void (*handler)(void), unsigned int retail_handler) {
     int index;
 
     for (index = 0; index < EVENTS; index++) {
@@ -67,8 +74,10 @@ int OpenEvent(unsigned int descriptor, int spec, int mode, void (*handler)(void)
             s_Events[index].spec = spec;
             s_Events[index].mode = mode;
             s_Events[index].handler = handler;
+            s_Events[index].retail_handler = retail_handler;
             s_Events[index].open = 1;
             s_Events[index].enabled = 0;
+            s_Events[index].ready = 0;
             return (int)(EVENT_HANDLE_BASE | (unsigned int)index);
         } else {
             /* Taken */
@@ -76,6 +85,14 @@ int OpenEvent(unsigned int descriptor, int spec, int mode, void (*handler)(void)
     }
     Host_Log("OpenEvent(0x%08X): no event left", descriptor);
     return EVENT_FAILURE;
+}
+
+int OpenEvent(unsigned int descriptor, int spec, int mode, void (*handler)(void)) {
+    return open_event(descriptor, spec, mode, handler, 0);
+}
+
+int Host_OpenRetailEvent(unsigned int descriptor, int spec, int mode, unsigned int handler) {
+    return open_event(descriptor, spec, mode, NULL, handler);
 }
 
 static int set_enabled(int handle, int enabled) {
@@ -108,10 +125,53 @@ int CloseEvent(int handle) {
     }
 }
 
-/* TRADEOFF: no event is ever pending (the memory card's come with milestone 7) */
+/* The events open on the descriptor and spec delivered: a handler run, or the event ready for TestEvent. On the game
+ * clock, the game's handlers on root counter 2 don't run: the clock sets the game's time itself (game_clock.c), as
+ * decomp's tools/run_game.lua undoes the handler's count */
+static void deliver(unsigned int descriptor, int spec) {
+    int index;
+
+    for (index = 0; index < EVENTS; index++) {
+        Event *event = &s_Events[index];
+
+        if (!event->open || !event->enabled || event->descriptor != descriptor || event->spec != spec) {
+            continue;
+        } else if (!(event->mode & EVENT_MODE_INTERRUPT)) {
+            event->ready = 1;
+        } else if (event->handler != NULL && !(descriptor == ROOT_COUNTER_2 && Host_GameClock())) {
+            event->handler();
+        } else if (event->retail_handler != 0) {
+            Host_SoundCall(event->retail_handler);
+        } else {
+            /* No handler, or the game's on the game clock */
+        }
+    }
+}
+
+void DeliverEvent(unsigned int descriptor, int spec) {
+    deliver(descriptor, spec);
+}
+
 int TestEvent(int handle) {
-    (void)handle;
-    return 0;
+    Event *event = event_of(handle);
+    int ready = event != NULL && event->ready;
+
+    if (ready) {
+        event->ready = 0;
+    } else {
+        /* Not delivered */
+    }
+    return ready;
+}
+
+/* WaitEvent: the event's delivery comes from an interrupt, which the host delivers before the code goes on */
+int WaitEvent(int handle) {
+    if (!TestEvent(handle)) {
+        Host_Fatal("WaitEvent(0x%08X) for an event nothing delivers", (unsigned int)handle);
+    } else {
+        /* Delivered */
+    }
+    return EVENT_SUCCESS;
 }
 
 void EnterCriticalSection(void) {
@@ -153,6 +213,15 @@ static int set_running(unsigned int spec, int running) {
     }
 }
 
+int ResetRCnt(unsigned int spec) {
+    if (counter_index(spec) == ROOT_COUNTER_2_INDEX) {
+        s_Counter2Cycles = 0;
+        return 1;
+    } else {
+        return counter_index(spec) >= 0;
+    }
+}
+
 int StartRCnt(unsigned int spec) {
     return set_running(spec, 1);
 }
@@ -161,28 +230,18 @@ int StopRCnt(unsigned int spec) {
     return set_running(spec, 0);
 }
 
-/* Root counter 2's interrupts in a frame, each calling the enabled events' handlers on it; none on the game clock,
- * which sets the game's time itself (game_clock.c) */
+/* Root counter 2's interrupts in a frame, each delivering its events */
 static void counter2_frame(void) {
     unsigned long long period = ROOT_COUNTER_2_DIVIDER * s_Targets[ROOT_COUNTER_2_INDEX] * VIDEO_HZ;
-    int index;
 
-    if (!s_Running[ROOT_COUNTER_2_INDEX] || period == 0 || Host_GameClock()) {
+    if (!s_Running[ROOT_COUNTER_2_INDEX] || period == 0) {
         return;
     } else {
         s_Counter2Cycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
     }
     while (s_Counter2Cycles >= period) {
         s_Counter2Cycles -= period;
-        for (index = 0; index < EVENTS; index++) {
-            Event *event = &s_Events[index];
-
-            if (event->open && event->enabled && event->descriptor == ROOT_COUNTER_2 && event->handler != NULL) {
-                event->handler();
-            } else {
-                /* Another event, or one not taking it */
-            }
-        }
+        deliver(ROOT_COUNTER_2, EVENT_SPEC_INTERRUPT);
     }
 }
 
@@ -198,7 +257,7 @@ void Host_VerticalBlank(void) {
     Host_PresentFrame();
     Host_PadVerticalBlank();
     counter2_frame();
-    SsSeqCalledTbyT();
+    Host_SoundVerticalBlank();
     s_SpuCycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
     Host_AudioFrame((uint32_t)(s_SpuCycles / VIDEO_HZ));
     s_SpuCycles %= VIDEO_HZ;

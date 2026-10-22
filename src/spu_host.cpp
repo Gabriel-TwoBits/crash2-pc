@@ -77,9 +77,21 @@ extern "C" void Spu_WriteRam(uint32_t address, const void* data, uint32_t bytes)
   g_spu.WriteRAM(address, data, bytes);
 }
 
-extern "C" void Spu_Run(uint32_t cycles)
+/* The CPU's cycles Spu_Advance ran ahead of the frames' */
+static uint32_t s_Advanced;
+
+extern "C" void Spu_Advance(uint32_t cycles)
 {
   g_spu.AddTicks(static_cast<TickCount>(cycles));
+  s_Advanced += cycles;
+}
+
+extern "C" void Spu_Run(uint32_t cycles)
+{
+  const uint32_t ahead = s_Advanced < cycles ? s_Advanced : cycles;
+
+  s_Advanced -= ahead;
+  g_spu.AddTicks(static_cast<TickCount>(cycles - ahead));
   g_spu.GeneratePendingSamples();
 }
 

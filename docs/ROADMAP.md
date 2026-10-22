@@ -22,8 +22,9 @@ matching"):
    registers and the native code. The cost: a 32-bit Windows process needs `LARGEADDRESSAWARE` and its image based at
    0x80000000 (milestone 8).
 3. **SDL3, and a software renderer.** SDL3 for the window, input and audio. The GPU's packets drawn by a software
-   rasterizer into a 1024×512 VRAM, the PlayStation's own model, before any GPU backend. The SPU in software, with
-   libsnd's sequencer written for the host.
+   rasterizer into a 1024×512 VRAM, the PlayStation's own model, before any GPU backend. The SPU in software, under
+   the retail executable's own libsnd and libspu, run from the player's disc on the interpreter (2026-10-22, in place
+   of a sequencer written for the host, which didn't reach the PS1's music: milestone 7).
 
 ## Milestones
 
@@ -60,14 +61,15 @@ matching"):
      every 0x1000 ticks of the CPU's clock / 8, the mode 0x258 that libapi's `SetRCnt` writes it. In the proportion of
      an NTSC frame's CPU cycles (263 lines of 3,413 video cycles at 53.693175 MHz, against 33.8688 MHz), that is
      17.28 calls of `Sys_TimerHandler` a frame.
-   - **SPU:** the paging waits on `func_80051328(0)` before and after a sound page's upload, which `src/psyq/libspu.c`
-     answers as done.
+   - **SPU:** the paging waits on `func_80051328(0)` (SpuIsTransferCompleted) before and after a sound page's upload,
+     which the retail libspu answers (milestone 7).
    - **Pad:** `src/psyq/pad.c` fills `InitPAD`'s buffers at each vertical blank, as the BIOS does: a digital pad with no
      button pressed in port 1, none in port 2. Left zeroed, they read as a pad with every button held, and the game
      stayed on its first screen (level 60).
-5. **The native code (done).** `src/native.c` interprets the 32 instructions the GOOL entries' native blocks
-   use, on the registers decomp's `gool_native` sets. As on the R3000, a branch runs its delay slot, a load's register
-   takes its value one instruction late, and a division by 0 leaves the CPU's results.
+5. **The native code (done).** `src/native.c` runs the GOOL entries' native blocks, which use 32 instructions, on the
+   registers decomp's `gool_native` sets, on the interpreter of `src/mips.c` (the R3000's integer instructions). As on
+   the R3000, a branch runs its delay slot, a load's register takes its value one instruction late, and a division by 0
+   leaves the CPU's results.
    - **Null pointers:** the PlayStation reads and writes its first 64 KB, the kernel's RAM, where Linux maps no page.
      The game goes there through null pointers: `Gool_ResolveRef`'s null operand (0xBE0), which `Gool_OpVector`
      reads. `src/low_ram.c` catches the fault, moves the instruction's address register onto a zeroed 64 KB copy, runs
@@ -144,37 +146,25 @@ matching"):
      order. Without a window, no button is pressed.
    - **SPU (done):** SwanStation's (`third_party/swanstation/core/spu.cpp`, ADPCM voices, ADSR, reverb), driven by
      `src/spu_host.cpp` with each frame's CPU cycles, its 44.1 kHz frames to an SDL3 audio stream (`src/audio.c`).
-     `src/psyq/libspu.c` writes its registers for the libspu functions the game calls, 10 of them by addresses the
-     split leaves unnamed: SpuSetKey (0x80051078), SpuGetAllKeysStatus (0x8005182C), SpuSetVoiceAttr (0x800518B8),
-     SpuGetVoiceAttr (0x800521A8, its volumes), SpuSetCommonAttr (0x800513D8), SpuSetTransferMode (0x800512F8),
-     SpuSetTransferStartAddr (0x80051298), SpuWrite (0x80051238), SpuSetReverbModeParam (0x800501A8), SpuSetReverb
-     (0x8004FE38), by their arguments and uses in decomp's `src/game/800324A8.c` and `800123F0.c`; the structures'
-     layouts from how the game fills them. The reverb's presets are psx-spx's. The game's own sound effects go
-     through them.
-   - **Music (in progress):** `src/psyq/libsnd.c` plays the SEPs' sequences over the VABs from psx-spx's formats, ticked
-     at each vertical blank (`SsSeqCalledTbyT`, which libsnd's data names), on the voices below `SsSetReservedVoice`'s
-     count. SsSepStop (0x80056304), SsSepSetVol (0x80056760), SsSepSetCrescendo (0x800528C4) and SsSepSetDecrescendo
-     (0x80052B4C) by their arguments and uses. Two facts of the formats psx-spx leaves out: the VAB's halfword at 0x12
-     is its programs' count itself, not less one (the title's VAB has 13 programs, and its 30 VAG sizes, read after 13
-     tone blocks, add up to its body's 0x3E6B0 bytes), and a SEQ's meta events carry no length (a tempo, FF 51, is
-     followed by its 3 bytes). libsnd's formulas are measured: the SPU registers the PS1's libsnd writes in PCSX-Redux,
-     caught with a write breakpoint, against the port's for the first 2,660 ticks of the intro's and the title's music.
-     A side's volume is 0x3FFF times the square of the product of the velocity, the tone's and the VAB's volumes (each
-     over 127) and the side's pan factor (the pan over 63, at most 1); the fine tuning counts 16ths of a semitone (the
-     tone's byte shifted right 3). The 327 notes then start on the same samples at the same ticks, 323 at the same pitch
-     and the PS1's other 4 one below, their volumes within 2 of the PS1's. In the second piece some notes start a tick
-     later than the PS1's.
-   - **Left:** the music against the PS1's note by note. `tools/compare_spu.py` on 12,000 vsyncs of the PS1 (intro,
-     title, demos) against 8,000 of the port: of the notes aligned, 711 last another length, most cut on the PS1 when
-     its libsnd takes their voice for a new note (its 16 voices all busy, it steals by a rule of its own); 69 start a
-     blank apart, the tick's rounding alternating them; a tone's volume over 127 gives the PS1 a voice volume past
-     0x3FFF, which the port's clamps. The programs', channels' and sequences' volumes and pans and the pitch bend's
-     range aren't measured. Then the memory card in files.
-   - **Next (decided 2026-10-22):** run the disc's own libsnd and libspu, their MIPS code from the player's disc as the
-     game's data is, on `src/native.c`'s interpreter, so the music is the PS1's by construction: the interpreter
-     extended to the instructions they use (lwl/lwr/swl/swr, mult/div, the rest of the loads and stores), libsnd's data
-     reached at its retail addresses (the port's data keeps their layout, tools/check_layout.py), the SPU's registers
-     and its DMA channel on the host's SPU, the OS calls they make (VSyncCallback, critical sections, root counters) on
-     the host's, and the game's calls into them through the interpreter. `src/psyq/libsnd.c` then goes;
-     `tools/compare_spu.py` checks it.
+   - **The sound libraries (done):** `src/sdk.c` runs the retail executable's libsnd and libspu, its code read from the
+     disc's `SCUS_941.54`, on `src/mips.c`: the music and the sound effects are the PlayStation's own. The interpreter
+     reads the executable's code and read-only data from the disc, its data and bss at the port's copy of them (their
+     layout kept, `tools/check_layout.py`; a word where the port's copy holds one of its functions reads as the
+     executable's), and the host's memory as it is. The game's calls into the libraries go through functions of
+     `src/sdk.c` at their retail addresses (`tools/sdk_symbols.py`, from the split); the libraries' calls to the system
+     come to hooks: critical sections, libetc's callbacks, libapi's events and root counters (`src/psyq/events.c`'s,
+     which the game's own share), printf. Their hardware: the SPU's registers, the sound's DMA channel (a copy into the
+     SPU's RAM at once), the interrupt controller, the memory control. What they need, as found: in the game's tick mode
+     (`SsSetTickMode(1)`) libsnd ticks from the vertical blank's interrupt callback (`InterruptCallback(0,
+     _SsTrapIntrVSync)`, root counter 3 at a target of 1); libspu's transfers end on an `EvSpTRAN` event its DMA
+     callback delivers; and its waits on the SPU's status need the SPU's time to move as they read it (64 cycles a
+     read).
+   - **Against the PS1:** `tools/compare_spu.py` on 12,000 vsyncs of the PS1 (intro, title, demos) against 8,000 of the
+     port: 1,763 notes aligned, each on the same sample, pitch, volumes and envelope as the PS1's, at the same blank
+     within its run of aligned notes. 36 differ, at the 5 points where the game stops a piece or silences every voice:
+     the PS1 runs in real time, the port on the game clock, which reach them at other times, and other demos after them,
+     the notes on one side only. A libsnd written for the host from psx-spx's formats, with its formulas measured on the
+     PS1, had 748 of 1,876 aligned notes differing (voices stolen by another rule, a tick's rounding): `src/sdk.c`
+     replaced it.
+   - **Left:** the memory card in files.
 8. **Windows.** The same build for 32-bit Windows.

@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
         Host_Fatal("usage: crash2 DISC.cue (or DISC.iso), or " DISC_VARIABLE " set to it");
     } else {
         Host_OpenDisc(disc);
+        Host_SoundStart();
     }
     D_8005CB28 = g_HostHeap;
     D_8005CB2C = HEAP_BYTES;

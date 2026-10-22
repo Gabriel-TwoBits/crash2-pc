@@ -15,7 +15,9 @@ A session takes the first milestone not done and updates docs/ROADMAP.md with wh
 - **Never commit a path of this machine** (an absolute path, a home folder): not in code, docs or build files. Run
   `git grep -nF "$PWD"` from the root before every push.
 - **Don't copy code from projects without a compatible licence.** The PsyQ libraries are Sony's: the port writes the
-  functions the game calls from their documented behaviour, never from their code. Emulators are references for the
+  functions the game calls from their documented behaviour, never from their code. libsnd and libspu run instead as the
+  retail executable's own machine code, read from the player's disc at start-up into the interpreter (`src/sdk.c`,
+  decided 2026-10-22): nothing of them is in the repository, as the game's data isn't. Emulators are references for the
   hardware's behaviour; their code comes in only under a licence compatible with GPL-3.0, into `third_party/NAME/`
   with its licence, a README naming its origin (repository and commit) and changes, and a notice on each file
   changed.

@@ -7,6 +7,7 @@
 #include "gpu.h"
 #include "host_log.h"
 #include "psyq/host_psyq.h"
+#include "retail.h"
 
 /* With CRASH2_GAME_CLOCK=DIR, the game clock of decomp's tools/run_game.lua: the root counter's interrupts don't reach
  * the game, and on entering Gfx_EndFrame (FRAME_ENDING) g_TimerTicks becomes the frame's number times 34, every game
@@ -22,11 +23,9 @@
 #define SHOTS_VARIABLE "CRASH2_GAME_CLOCK_SHOTS"
 #define SHOTS_MAX 64
 #define DUMPS_VARIABLE "CRASH2_GAME_CLOCK_DUMPS"
-/* The PlayStation's 2 MB, and the retail image's data and bss within it (decomp/docs/TARGET.md) */
+/* The PlayStation's 2 MB, which holds the retail image's data and bss (retail.h) */
 #define RAM_BYTES 0x200000
 #define RAM_ADDRESS_MASK (RAM_BYTES - 1)
-#define DATA_START 0x8005B198u
-#define BSS_END 0x8006F1F0u
 #define FIVE_BITS 31
 #define GREEN_SHIFT 5
 #define BLUE_SHIFT 10
@@ -51,7 +50,6 @@ static int s_Dumps[SHOTS_MAX];
 static int s_DumpCount;
 
 /* The split's first data symbol: the retail data's start, where tools/check_layout.py keeps the rest after it */
-extern char g_EidAlphabet[];
 
 /* A comma-separated list of game frames into frames (SHOTS_MAX at most): their number */
 static int frame_list(const char *text, int *frames) {
@@ -169,7 +167,7 @@ static void dump(void) {
     if (ram == NULL) {
         Host_Fatal("no memory for a RAM dump");
     } else {
-        memcpy(ram + (DATA_START & RAM_ADDRESS_MASK), g_EidAlphabet, BSS_END - DATA_START);
+        memcpy(ram + (RETAIL_DATA_START & RAM_ADDRESS_MASK), g_EidAlphabet, RETAIL_BSS_END - RETAIL_DATA_START);
         snprintf(path, sizeof(path), "%s/ram_%d.bin", s_Directory, s_GameFrame);
         file = fopen(path, "wb");
     }

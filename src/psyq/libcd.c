@@ -1,5 +1,8 @@
+#include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 
 #include "host_log.h"
 #include "psyq/host_psyq.h"
@@ -30,6 +33,19 @@
 #define CD_SYNC_COMPLETE 2
 #define CD_STATUS_STANDBY 0x02
 #define CD_READ_DONE 0
+/* ISO 9660 (ECMA-119): the primary volume descriptor's sector and identifier, its root directory's record, and a
+ * directory record's fields */
+#define VOLUME_DESCRIPTOR_SECTOR 16
+#define VOLUME_IDENTIFIER_OFFSET 1
+#define VOLUME_IDENTIFIER "CD001"
+#define ROOT_RECORD_OFFSET 156
+#define RECORD_LENGTH 0
+#define RECORD_EXTENT 2
+#define RECORD_SIZE 10
+#define RECORD_NAME_LENGTH 32
+#define RECORD_NAME 33
+#define BYTE_BITS 8
+#define WORD_BYTES 4
 
 typedef struct {
     unsigned char minute, second, sector, track;
@@ -157,26 +173,88 @@ int CdControlF(unsigned char command, unsigned char *parameter) {
     return control(command, parameter, NULL);
 }
 
-/* SECTORS sectors' user data from the position into BUFFER; mode's speed doesn't matter here */
-int CdRead(int sectors, unsigned long *buffer, int mode) {
-    unsigned char *out = (unsigned char *)buffer;
+static void read_sectors(int first, int sectors, unsigned char *out) {
     int index;
 
-    (void)mode;
     if (s_Image == NULL) {
-        Host_Fatal("CdRead with no disc image");
+        Host_Fatal("a read with no disc image");
     } else {
         for (index = 0; index < sectors; index++) {
-            if (fseek(s_Image, (long)(s_Position + index) * s_SectorBytes + s_DataOffset, SEEK_SET) != 0 ||
+            if (fseek(s_Image, (long)(first + index) * s_SectorBytes + s_DataOffset, SEEK_SET) != 0 ||
                 fread(out + index * SECTOR_DATA_BYTES, SECTOR_DATA_BYTES, 1, s_Image) != 1) {
-                Host_Fatal("can't read sector %d of the disc image", s_Position + index);
+                Host_Fatal("can't read sector %d of the disc image", first + index);
             } else {
                 /* Read */
             }
         }
-        s_Position += sectors;
     }
+}
+
+/* SECTORS sectors' user data from the position into BUFFER; mode's speed doesn't matter here */
+int CdRead(int sectors, unsigned long *buffer, int mode) {
+    (void)mode;
+    read_sectors(s_Position, sectors, (unsigned char *)buffer);
+    s_Position += sectors;
     return CD_SUCCESS;
+}
+
+static uint32_t little_word(const unsigned char *bytes) {
+    uint32_t value = 0;
+    int index;
+
+    for (index = WORD_BYTES - 1; index >= 0; index--) {
+        value = (value << BYTE_BITS) | bytes[index];
+    }
+    return value;
+}
+
+void *Host_ReadDiscFile(const char *name, unsigned int *bytes) {
+    unsigned char sector[SECTOR_DATA_BYTES];
+    unsigned char *directory;
+    unsigned char *file = NULL;
+    uint32_t extent, size, offset;
+    size_t name_length = strlen(name);
+
+    read_sectors(VOLUME_DESCRIPTOR_SECTOR, 1, sector);
+    if (memcmp(sector + VOLUME_IDENTIFIER_OFFSET, VOLUME_IDENTIFIER, strlen(VOLUME_IDENTIFIER)) != 0) {
+        Host_Fatal("the disc image has no ISO 9660 volume");
+    } else {
+        extent = little_word(sector + ROOT_RECORD_OFFSET + RECORD_EXTENT);
+        size = little_word(sector + ROOT_RECORD_OFFSET + RECORD_SIZE);
+    }
+    directory = malloc(size + SECTOR_DATA_BYTES);
+    if (directory == NULL) {
+        Host_Fatal("no memory for the disc's root directory");
+    } else {
+        read_sectors((int)extent, (int)((size + SECTOR_DATA_BYTES - 1) / SECTOR_DATA_BYTES), directory);
+    }
+    for (offset = 0; offset < size && file == NULL;) {
+        const unsigned char *record = directory + offset;
+
+        if (record[RECORD_LENGTH] == 0) {
+            /* No record across a sector's end: the next starts the next sector */
+            offset = (offset / SECTOR_DATA_BYTES + 1) * SECTOR_DATA_BYTES;
+        } else if (record[RECORD_NAME_LENGTH] == name_length &&
+                   strncasecmp((const char *)record + RECORD_NAME, name, name_length) == 0) {
+            *bytes = little_word(record + RECORD_SIZE);
+            file = malloc(*bytes + SECTOR_DATA_BYTES);
+            if (file == NULL) {
+                Host_Fatal("no memory for the disc's %s", name);
+            } else {
+                read_sectors((int)little_word(record + RECORD_EXTENT),
+                             (int)((*bytes + SECTOR_DATA_BYTES - 1) / SECTOR_DATA_BYTES), file);
+            }
+        } else {
+            offset += record[RECORD_LENGTH];
+        }
+    }
+    free(directory);
+    if (file == NULL) {
+        Host_Fatal("the disc has no %s", name);
+    } else {
+        /* Found */
+    }
+    return file;
 }
 
 int CdReadSync(int mode, unsigned char *result) {

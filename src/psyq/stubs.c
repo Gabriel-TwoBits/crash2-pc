@@ -2,7 +2,7 @@
 
 /* The PsyQ functions the game calls, each a stub that returns 0 and logs its first call.
  * TRADEOFF: stubs until each library is written for the host (docs/ROADMAP.md, milestones 4 to 7); events.c,
- * libcd.c, libgpu.c, libgte.c, libsnd.c, libspu.c and pad.c hold those written so far */
+ * libcd.c, libgpu.c, libgte.c and pad.c hold those written so far, and src/sdk.c runs the retail libsnd and libspu */
 #define PSYQ_STUB(name) \
     int name() { \
         static int called; \
