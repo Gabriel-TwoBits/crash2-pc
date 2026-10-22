@@ -30,7 +30,7 @@ Wayland window (the i386 architecture enabled):
 
 ```sh
 sudo dpkg --add-architecture i386 && sudo apt update
-sudo apt install gcc-multilib cmake ninja-build python3-venv \
+sudo apt install gcc-multilib g++-multilib cmake ninja-build python3-venv \
     libwayland-client0:i386 libwayland-egl1:i386 libwayland-cursor0:i386 libxkbcommon0:i386 libegl1:i386
 git clone --recursive https://github.com/Gabriel-TwoBits/crash2-pc.git
 cd crash2-pc/decomp
@@ -70,4 +70,5 @@ same C.
 
 ## Licence
 
-GPL-3.0 ([LICENSE](LICENSE)), as the decompilation it is built from.
+GPL-3.0 ([LICENSE](LICENSE)), as the decompilation it is built from. `third_party/` holds others' code under licences
+compatible with it, each with its origin and changes ([third_party/swanstation](third_party/swanstation/README.md)).

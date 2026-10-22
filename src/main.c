@@ -26,28 +26,28 @@ extern unsigned int D_8005CB2C;
 void func_8001144C(int *start, unsigned int bytes);
 int Game_Main(void);
 
-/* GNU ld's: the program's first and last addresses */
+/* GNU ld's: the program's first address */
 extern char __executable_start[];
-extern char _end[];
 
 unsigned char g_HostScratchpad[SCRATCHPAD_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
 static unsigned char s_Heap[HEAP_BYTES + HEAP_SLACK_BYTES] __attribute__((aligned(WORD_ALIGNMENT)));
 
-#define PAGE_BYTES 0x1000
+/* The linker's window reservation past the program (cmake/game_data.ld) */
+extern char __window_rest_start[];
+extern char __window_rest_end[];
 
-/* The program in the window, and the window's rest reserved, unreadable: the C library's allocations stay out of the
- * game's RAM, and the game's access past its image faults (low_ram.c reports it) */
+/* The program in the window, the window's rest unreadable: the game's access past its image faults (low_ram.c
+ * reports it) */
 static void check_window(void) {
     unsigned int first = (unsigned int)__executable_start;
-    unsigned int last = (unsigned int)_end;
-    unsigned int rest = (last + PAGE_BYTES - 1) & ~(PAGE_BYTES - 1);
+    unsigned int last = (unsigned int)__window_rest_start;
+    unsigned int rest = (unsigned int)(__window_rest_end - __window_rest_start);
 
-    if (first < RAM_WINDOW || last > RAM_WINDOW + RAM_WINDOW_BYTES) {
+    if (first < RAM_WINDOW || (unsigned int)__window_rest_end != RAM_WINDOW + RAM_WINDOW_BYTES) {
         Host_Fatal("the program spans 0x%08X to 0x%08X, outside the 8 MB window at 0x%08X (src/host.h)", first, last,
                    RAM_WINDOW);
-    } else if (mmap((void *)rest, RAM_WINDOW + RAM_WINDOW_BYTES - rest, PROT_NONE,
-                    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE, -1, 0) != (void *)rest) {
-        Host_Fatal("can't reserve the window from 0x%08X: something is mapped there", rest);
+    } else if (mprotect(__window_rest_start, rest, PROT_NONE) != 0) {
+        Host_Fatal("can't protect the window from 0x%08X", last);
     } else {
         Host_Log("the program spans 0x%08X to 0x%08X, the window reserved past it", first, last);
     }

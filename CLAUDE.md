@@ -16,7 +16,9 @@ A session takes the first milestone not done and updates docs/ROADMAP.md with wh
   `git grep -nF "$PWD"` from the root before every push.
 - **Don't copy code from projects without a compatible licence.** The PsyQ libraries are Sony's: the port writes the
   functions the game calls from their documented behaviour, never from their code. Emulators are references for the
-  hardware's behaviour; their code comes in only under a licence compatible with GPL-3.0, with its notice kept.
+  hardware's behaviour; their code comes in only under a licence compatible with GPL-3.0, into `third_party/NAME/`
+  with its licence, a README naming its origin (repository and commit) and changes, and a notice on each file
+  changed.
 - **The PlayStation build is the reference.** A difference in what the port shows or computes is checked against the
   decompilation's equivalent build running the same C in an emulator before it is called a bug of either.
 

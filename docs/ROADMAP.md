@@ -87,10 +87,12 @@ matching"):
      differ.
    - **Left:** the blocks no demo level runs, with the levels played.
 6. **The picture (in progress).** The display in an SDL3 window, from a GPU in software.
-   - **GPU:** `src/gpu.c` holds the 1024×512 VRAM and runs the GP0 commands, from psx-spx: polygons (flat, Gouraud,
-     textured through 4- and 8-bit CLUTs or 15-bit texels, raw or modulated), lines and polylines, rectangles, fills,
-     VRAM copies and loads, the draw mode, texture window, drawing area, offset and mask. Semi-transparency, dithering
-     and the mask bit as the GPU does them.
+   - **GPU:** `src/gpu.c` holds the 1024×512 VRAM, reads the GP0 commands (psx-spx) and keeps the drawing state (E1
+     to E6). SwanStation's software rasterizer draws (`third_party/swanstation`, GPL-3.0, from Mednafen's): polygons,
+     lines, rectangles, fills, copies and loads with the GPU's own stepping, dithering, semi-transparency and mask.
+     `src/gpu_raster.cpp` hands each primitive over as SwanStation's front end does. It replaced a rasterizer of the
+     port's own (edge functions, attributes per pixel), for a picture the emulators' tests stand behind; headless, the
+     run went from about 180 vertical blanks a second to about 310.
    - **libgpu:** `src/psyq/libgpu.c` walks the ordering table (24-bit links to KSEG0, decision 2), and sets the draw
      and display environments from the game's structures: DISPENV's 0x14 bytes, DRAWENV's dtd at 0x16 and dfe at 0x17,
      as `Gfx_Init` writes them.
@@ -102,7 +104,10 @@ matching"):
      3,413 video cycles at 53.693175 MHz). `CRASH2_HEADLESS` runs without a window; `CRASH2_DUMP=DIR` writes the display
      every `CRASH2_DUMP_EVERY` blanks as PPM, all of VRAM with `CRASH2_DUMP_VRAM`.
    - **SDL3:** 3.2.10 from its release, pinned by SHA-256 and built as a shared library beside the program. Static, it
-     took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for. Its Wayland window needs the 32-bit
+     took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for.
+   - **The window's rest:** `cmake/game_data.ld` holds the rest of the 8 MB, to 0x80800000, as an empty section, which
+     `main.c` makes unreadable. With libstdc++ linked, the C library's heap starts before `main`, right past the
+     program, where a reservation at run time found it. Its Wayland window needs the 32-bit
      `libwayland-egl1` and `libwayland-cursor0` (README.md); without them it found no video device. X11 isn't built:
      its CMake finds no 32-bit `libX11.so`.
    - **Run:** the Naughty Dog logo over its nebula, Crash flying out at the title, the title screen with its menu as

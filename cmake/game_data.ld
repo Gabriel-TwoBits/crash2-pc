@@ -9,3 +9,16 @@ SECTIONS
     }
 }
 INSERT BEFORE .data;
+
+/* The rest of the PlayStation's RAM window, to 0x80800000 (src/host.h), held by the program: the C library's
+ * allocations start past it, and main.c makes it unreadable, so that the game's access past its image faults */
+SECTIONS
+{
+    .window_rest (NOLOAD) : ALIGN(0x1000)
+    {
+        __window_rest_start = ABSOLUTE(.);
+        . += 0x80800000 - __window_rest_start;
+        __window_rest_end = ABSOLUTE(.);
+    }
+}
+INSERT AFTER .bss;
