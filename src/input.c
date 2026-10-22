@@ -2,27 +2,9 @@
 
 #include "input.h"
 
-/* The pad's buttons from the host's keyboard and first gamepad, a bit each in the digital pad's order (psx-spx, "Pad
- * Communication"), set while pressed. Keyboard: the arrows, X cross, Z square, C circle, V triangle, Enter start,
- * Backspace select, A and S L1 and R1, Q and W L2 and R2. A gamepad's buttons where the PlayStation's sit, its left
- * stick as the directions */
-
-enum {
-    PAD_SELECT = 1 << 0,
-    PAD_START = 1 << 3,
-    PAD_UP = 1 << 4,
-    PAD_RIGHT = 1 << 5,
-    PAD_DOWN = 1 << 6,
-    PAD_LEFT = 1 << 7,
-    PAD_L2 = 1 << 8,
-    PAD_R2 = 1 << 9,
-    PAD_L1 = 1 << 10,
-    PAD_R1 = 1 << 11,
-    PAD_TRIANGLE = 1 << 12,
-    PAD_CIRCLE = 1 << 13,
-    PAD_CROSS = 1 << 14,
-    PAD_SQUARE = 1 << 15
-};
+/* The pad's buttons (input.h) from the host's keyboard and first gamepad, set while pressed. Keyboard: the arrows, X
+ * cross, Z square, C circle, V triangle, Enter start, Backspace select, A and S L1 and R1, Q and W L2 and R2. A
+ * gamepad's buttons where the PlayStation's sit, its left stick as the directions */
 
 /* A stick past half its travel counts as the direction */
 #define STICK_THRESHOLD 16384

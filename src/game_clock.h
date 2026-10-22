@@ -5,5 +5,7 @@
  * Gfx_EndFrame */
 int Host_GameClock(void);
 void Host_FrameEnding(void);
+/* The buttons CRASH2_GAME_CLOCK_PRESSES holds in the game frame running, besides the host's */
+unsigned int Host_ClockButtons(void);
 
 #endif /* GAME_CLOCK_H */

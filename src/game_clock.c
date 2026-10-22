@@ -6,6 +6,7 @@
 #include "game_clock.h"
 #include "gpu.h"
 #include "host_log.h"
+#include "input.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
 
@@ -23,6 +24,13 @@
 #define SHOTS_VARIABLE "CRASH2_GAME_CLOCK_SHOTS"
 #define SHOTS_MAX 64
 #define DUMPS_VARIABLE "CRASH2_GAME_CLOCK_DUMPS"
+/* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
+ * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
+#define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
+#define PRESSES_MAX 256
+#define LINE_BYTES 256
+#define BUTTON_NAME_BYTES 16
+#define PRESS_FIELDS 3
 /* The PlayStation's 2 MB, which holds the retail image's data and bss (retail.h) */
 #define RAM_BYTES 0x200000
 #define RAM_ADDRESS_MASK (RAM_BYTES - 1)
@@ -48,6 +56,84 @@ static int s_Shots[SHOTS_MAX];
 static int s_ShotCount;
 static int s_Dumps[SHOTS_MAX];
 static int s_DumpCount;
+
+typedef struct {
+    int first, last;
+    unsigned int button;
+} Press;
+
+static Press s_Presses[PRESSES_MAX];
+static int s_PressCount;
+static unsigned int s_Held;
+
+/* PCSX.CONSTS.PAD.BUTTON's names, which run_game.lua's schedules use */
+static const struct {
+    const char *name;
+    unsigned int button;
+} s_ButtonNames[] = {
+    {"SELECT", PAD_SELECT}, {"L3", PAD_L3},     {"R3", PAD_R3},     {"START", PAD_START},
+    {"UP", PAD_UP},         {"RIGHT", PAD_RIGHT}, {"DOWN", PAD_DOWN}, {"LEFT", PAD_LEFT},
+    {"L2", PAD_L2},         {"R2", PAD_R2},     {"L1", PAD_L1},     {"R1", PAD_R1},
+    {"TRIANGLE", PAD_TRIANGLE}, {"CIRCLE", PAD_CIRCLE}, {"CROSS", PAD_CROSS}, {"SQUARE", PAD_SQUARE},
+};
+
+static unsigned int button_named(const char *name) {
+    size_t index;
+
+    for (index = 0; index < sizeof(s_ButtonNames) / sizeof(s_ButtonNames[0]); index++) {
+        if (strcmp(s_ButtonNames[index].name, name) == 0) {
+            return s_ButtonNames[index].button;
+        } else {
+            continue;
+        }
+    }
+    Host_Fatal("%s: no button %s", PRESSES_VARIABLE, name);
+    return 0;
+}
+
+static void read_presses(const char *path) {
+    FILE *file = fopen(path, "r");
+    char line[LINE_BYTES];
+
+    if (file == NULL) {
+        Host_Fatal("%s: can't read %s", PRESSES_VARIABLE, path);
+    } else {
+        while (fgets(line, sizeof(line), file) != NULL) {
+            char name[BUTTON_NAME_BYTES];
+            Press press;
+
+            if (strncmp(line, "press ", strlen("press ")) != 0) {
+                continue;
+            } else if (sscanf(line + strlen("press "), "%d %d %15s", &press.first, &press.last, name) !=
+                       PRESS_FIELDS || s_PressCount >= PRESSES_MAX) {
+                Host_Fatal("%s: a press line it can't take: %s", PRESSES_VARIABLE, line);
+            } else {
+                press.button = button_named(name);
+                s_Presses[s_PressCount++] = press;
+            }
+        }
+        fclose(file);
+    }
+}
+
+/* The buttons the schedule holds in a game frame */
+static unsigned int held_in(int frame) {
+    unsigned int buttons = 0;
+    int index;
+
+    for (index = 0; index < s_PressCount; index++) {
+        if (frame >= s_Presses[index].first && frame <= s_Presses[index].last) {
+            buttons |= s_Presses[index].button;
+        } else {
+            /* Not this press's frames */
+        }
+    }
+    return buttons;
+}
+
+unsigned int Host_ClockButtons(void) {
+    return s_Held;
+}
 
 /* The split's first data symbol: the retail data's start, where tools/check_layout.py keeps the rest after it */
 
@@ -79,6 +165,11 @@ static void start(void) {
     }
     s_ShotCount = frame_list(getenv(SHOTS_VARIABLE), s_Shots);
     s_DumpCount = frame_list(getenv(DUMPS_VARIABLE), s_Dumps);
+    if (getenv(PRESSES_VARIABLE) != NULL) {
+        read_presses(getenv(PRESSES_VARIABLE));
+    } else {
+        /* No presses */
+    }
     if (s_Frames == NULL) {
         Host_Fatal("can't write %s", path);
     } else if (last != NULL) {
@@ -197,6 +288,8 @@ void Host_FrameEnding(void) {
     }
     s_GameFrame++;
     g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);
+    /* As run_game.lua's: the presses apply to the game frame after the one ending */
+    s_Held = held_in(s_GameFrame + 1);
     if (s_LastFrame >= 0 && s_GameFrame > s_LastFrame) {
         fclose(s_Frames);
         Host_Log("game clock: %d game frames written", s_GameFrame);

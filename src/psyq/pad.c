@@ -1,5 +1,6 @@
 #include <stddef.h>
 
+#include "game_clock.h"
 #include "input.h"
 #include "psyq/host_psyq.h"
 
@@ -50,7 +51,7 @@ void Host_PadVerticalBlank(void) {
     if (!s_Started || s_Port1 == NULL || s_Port1Bytes < PAD_DIGITAL_BYTES) {
         return;
     } else {
-        unsigned int released = ~Host_InputButtons();
+        unsigned int released = ~(Host_InputButtons() | Host_ClockButtons());
 
         s_Port1[PAD_STATUS] = PAD_CONNECTED;
         s_Port1[PAD_KIND] = PAD_DIGITAL;
