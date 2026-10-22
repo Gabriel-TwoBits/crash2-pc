@@ -232,3 +232,23 @@ matching"):
      its dialog with no error.
    - **Left:** Windows itself, which no machine here runs, and the AppImage on a desktop: their windows, sound and
      gamepads through SDL3.
+9. **Settings, in the game.** The game has no options screen: an overlay menu of the host's own, Dear ImGui (MIT)
+   through SDL3, opened over the game by F1 or the gamepad's guide button, which pauses the game while open and leaves
+   it where it was. Its choices are kept in `settings.ini` in SDL's preference folder: the window (fullscreen, size,
+   vsync, the picture's aspect), the volume, the keyboard's and the gamepad's buttons; the enhancements below as they
+   come. Closed and untouched, the game plays the same frames.
+10. **A GPU renderer.** The GPU's packets drawn by SDL_GPU (Vulkan, Direct3D 12 or Metal) at a higher internal
+    resolution (2×, 4×, the display's), with the PlayStation's VRAM as a texture: 24-bit colour without the dithering,
+    optional texture filtering and anti-aliasing. The software renderer stays, the reference the frames' hashes and the
+    comparisons with the PlayStation go by.
+11. **Steady polygons.** The PlayStation's vertices snap to whole pixels (the jitter) and its textures are mapped
+    without perspective (the warping). The GTE runs in the host's C: where it stores a screen coordinate
+    (`GTE_STORE_DATA` of SXY, 61 places, nearly all in the world's and the objects' renderers) it can keep the
+    coordinate's fraction and depth beside it, which the GPU renderer draws with, sub-pixel and perspective-correct. To
+    find first: how much of the game copies coordinates past the macro.
+12. **Widescreen.** A wider field of view through the GTE's projection, the game's culling of what falls outside a 4:3
+    screen measured and widened where objects would vanish at the edges.
+13. **The frame rate.** 30 frames a second as the PlayStation runs it, or more. Much of the game measures its time by
+    `g_TimerTicks`, not all: what a game frame of 60 changes (physics, animations, the GOOL scripts) is measured first;
+    failing that, the game's logic at 30 and the picture interpolated between its frames.
+14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
