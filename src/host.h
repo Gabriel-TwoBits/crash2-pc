@@ -27,6 +27,10 @@ extern unsigned int g_HostGte[];
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 
+/* The game clock's step where a game frame ends (game_clock.c) */
+#define FRAME_ENDING() Host_FrameEnding()
+void Host_FrameEnding(void);
+
 /* Operation 73's native code (native.c) */
 #define GOOL_RUN_NATIVE Host_RunNative
 struct GoolObject;

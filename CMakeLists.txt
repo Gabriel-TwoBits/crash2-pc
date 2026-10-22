@@ -62,6 +62,7 @@ set_source_files_properties(${HOST_DATA} PROPERTIES GENERATED TRUE COMPILE_OPTIO
 
 add_executable(crash2
     src/main.c
+    src/game_clock.c
     src/host_log.c
     src/input.c
     src/gpu.c

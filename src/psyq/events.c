@@ -1,6 +1,7 @@
 #include <stddef.h>
 
 #include "host_log.h"
+#include "game_clock.h"
 #include "psyq/host_psyq.h"
 #include "video.h"
 
@@ -156,12 +157,13 @@ int StopRCnt(unsigned int spec) {
     return set_running(spec, 0);
 }
 
-/* Root counter 2's interrupts in a frame, each calling the enabled events' handlers on it */
+/* Root counter 2's interrupts in a frame, each calling the enabled events' handlers on it; none on the game clock,
+ * which sets the game's time itself (game_clock.c) */
 static void counter2_frame(void) {
     unsigned long long period = ROOT_COUNTER_2_DIVIDER * s_Targets[ROOT_COUNTER_2_INDEX] * VIDEO_HZ;
     int index;
 
-    if (!s_Running[ROOT_COUNTER_2_INDEX] || period == 0) {
+    if (!s_Running[ROOT_COUNTER_2_INDEX] || period == 0 || Host_GameClock()) {
         return;
     } else {
         s_Counter2Cycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
@@ -182,6 +184,10 @@ static void counter2_frame(void) {
 
 /* Headless, a line every so many blanks shows the game going on */
 #define FRAMES_PER_LOG 600
+
+int Host_Blanks(void) {
+    return s_Frames;
+}
 
 void Host_VerticalBlank(void) {
     s_Frames++;
