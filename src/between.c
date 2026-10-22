@@ -31,8 +31,10 @@
 /* The camera: its position and angles, six words from g_CameraX (decomp's config/symbol_addrs.txt) */
 #define CAMERA_WORDS 6
 #define CAMERA_ANGLES_FIRST 3
-/* A frame buffer's drawing environment and ordering table (decomp's 800158E0.c), its drawing area's corner first */
+/* A frame buffer's ordering table, display environment (its displayed rectangle's corner first) and drawing
+ * environment (decomp's 800158E0.c) */
 #define FRAME_OT 0x18
+#define FRAME_DISP_ENV 0x2018
 #define FRAME_DRAW_ENV 0x202C
 #define FRAME_SHOWN_QUEUE 2
 
@@ -49,6 +51,11 @@ typedef struct {
 extern int32_t g_CameraX[CAMERA_WORDS];
 extern unsigned char *g_BuildBuffer[];
 extern unsigned char *g_DrawBuffer;
+/* The game frames left before the game draws again, and the frame's flags, whose FLAGS_COUNTERS_STOPPED the memory
+ * card's screens set (decomp's Gfx_EndFrame) */
+extern int32_t D_800675AC;
+extern int32_t D_8006CB94;
+#define FLAGS_COUNTERS_STOPPED 0x200000
 void func_800163C4(int32_t *frame);
 int VSync(int mode);
 void *PutDrawEnv(void *env);
@@ -163,9 +170,12 @@ static void camera_halfway(void) {
 }
 
 void Host_FrameEnded(void) {
-    s_DrawnX = *(int16_t *)(g_DrawBuffer + FRAME_DRAW_ENV);
-    s_DrawnY = *(int16_t *)(g_DrawBuffer + FRAME_DRAW_ENV + sizeof(int16_t));
-    if (g_Settings[SETTING_FRAME_RATE].value == 0) {
+    s_DrawnX = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV);
+    s_DrawnY = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV + sizeof(int16_t));
+    if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED)) {
+        /* Off; or a game frame that drew nothing (the game leaves the buffers as they are while a level opens); or
+         * the memory card's screens, whose game frames the game runs a vertical blank each, at 60 already: the
+         * display the game's own */
         s_ShownCount = 0;
         return;
     } else {
@@ -198,8 +208,8 @@ void Host_FrameBetweenShown(void) {
     Obj_ForEachList((void *)Obj_ForEachDescendant, (void *)restore, NULL);
     memcpy(g_CameraX, s_CameraNow, sizeof(s_CameraNow));
     /* The frame between, then the game frame it leads to */
-    s_ShownX[0] = *(int16_t *)(frame + FRAME_DRAW_ENV);
-    s_ShownY[0] = *(int16_t *)(frame + FRAME_DRAW_ENV + sizeof(int16_t));
+    s_ShownX[0] = *(int16_t *)(frame + FRAME_DISP_ENV);
+    s_ShownY[0] = *(int16_t *)(frame + FRAME_DISP_ENV + sizeof(int16_t));
     s_ShownX[1] = s_DrawnX;
     s_ShownY[1] = s_DrawnY;
     s_ShownCount = FRAME_SHOWN_QUEUE;

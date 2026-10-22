@@ -16,7 +16,7 @@
  * the game's draw lists have them: one at the edge may still come in late.
  * TRADEOFF: a fixed count of nodes around; how far a node reaches across differs from path to path */
 
-#define NODES_AROUND 6
+#define NODES_AROUND 12
 /* The camera paths that look at the world side-on, whose nodes ahead and behind lie across the view (path kinds 3 and
  * 8, by Crash2Recomp's notes: decomp's config/symbol_addrs.txt). Along a path into the view they lie ahead of the
  * camera and behind it, and behind it the game's renderer draws them wrong: those keep the camera's list */
@@ -37,6 +37,8 @@
 #define PROPERTY_SORT_LIST 0x103
 #define PROPERTY_ROW_KIND 2
 #define ENTRY_ITEMS 0x10
+/* A word's low bit: an EID (or a page's), not a pointer */
+#define EID_TAG 1
 #define WORD_BYTES 4
 #define FORWARD 1
 #define BACKWARD 0
@@ -47,8 +49,6 @@
 /* The game's (decomp's include/game.h, 80026CA0.c) */
 int32_t Heap_Alloc(int32_t bytes);
 void Heap_Free(int32_t buffer);
-void *Nsf_OpenEntry(void *reference, int32_t kind, int32_t wait);
-int32_t Nsf_CloseEntry(void *reference, int32_t kind);
 int32_t Ent_GetProperty(int32_t entity, int32_t property, int32_t row, int32_t column, int32_t *out, int32_t kind,
                         int32_t *count, int32_t a, int32_t b);
 uint16_t *func_80029800(uint16_t *delta, int32_t from, uint16_t *to, int32_t forward);
@@ -208,8 +208,34 @@ static void write_wide(const uint16_t *camera, int count) {
     s_Wide[1] = camera[1];
 }
 
+/* An entry by its reference if the paging has it in memory, NULL if not: as Nsf_OpenEntry finds it, without its
+ * opening (which pages it in and counts a holder) */
+static unsigned char *resident(const uint32_t *reference) {
+    uint32_t record;
+    uint32_t entry;
+
+    if (reference == NULL) {
+        return NULL;
+    } else {
+        record = *reference;
+    }
+    if ((record & EID_TAG) || record == 0) {
+        /* An EID not looked up yet */
+        return NULL;
+    } else {
+        entry = *(const uint32_t *)(uintptr_t)record;
+    }
+    if (entry & EID_TAG) {
+        /* Its page not in memory */
+        return NULL;
+    } else {
+        return (unsigned char *)(uintptr_t)entry;
+    }
+}
+
 uint16_t *Host_WorldSortList(uint16_t *camera) {
-    void *reference;
+    const uint32_t *reference;
+    unsigned char *entry;
     uint16_t *const *items;
     int count = (int16_t)camera[0];
     int index;
@@ -218,13 +244,14 @@ uint16_t *Host_WorldSortList(uint16_t *camera) {
         (g_CameraPathKind != PATH_SIDE_ON && g_CameraPathKind != PATH_SIDE_ON_TOO)) {
         return camera;
     } else {
-        reference = (void *)(uintptr_t)Ent_GetProperty(g_CameraPath, PROPERTY_SORT_LIST, 0, 0, 0, PROPERTY_ROW_KIND,
-                                                       0, 0, 0);
+        reference = (const uint32_t *)(uintptr_t)Ent_GetProperty(g_CameraPath, PROPERTY_SORT_LIST, 0, 0, 0,
+                                                                 PROPERTY_ROW_KIND, 0, 0, 0);
     }
-    if (reference == NULL) {
+    entry = resident(reference);
+    if (entry == NULL) {
         return camera;
     } else {
-        items = (uint16_t *const *)((unsigned char *)Nsf_OpenEntry(reference, 1, 1) + ENTRY_ITEMS);
+        items = (uint16_t *const *)(entry + ENTRY_ITEMS);
     }
     memset(s_Place, 0xFF, sizeof(s_Place));
     s_WorldsUsed = 0;
@@ -235,7 +262,6 @@ uint16_t *Host_WorldSortList(uint16_t *camera) {
     s_AddedCount = 0;
     add_from(list_at(camera, items, NODES_AROUND, FORWARD, s_Around));
     add_from(list_at(camera, items, NODES_AROUND, BACKWARD, s_Around));
-    Nsf_CloseEntry(reference, 1);
     write_wide(camera, count);
     return s_Wide;
 }
