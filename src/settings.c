@@ -16,26 +16,26 @@
 #define LINE_BYTES 256
 #define DECIMAL 10
 
-/* Each value names the setting, as the pause menu's MONO and STEREO do: its rows hold some 12 characters */
-static const char *const s_Displays[] = {"WINDOW", "FULLSCREEN"};
-static const char *const s_Shapes[] = {"4:3", "STRETCHED", "16:9"};
-static const char *const s_Smoothing[] = {"SHARP", "SMOOTH"};
-static const char *const s_Resolutions[] = {"PS1 RES", "2X RES", "3X RES", "4X RES", "6X RES", "8X RES"};
+/* The options screen's names, short: a row shows "<NAME: VALUE>" in some 16 characters. Wobble and warping are the
+ * PlayStation's polygons' jitter and its textures' warping, on as it draws them */
+static const char *const s_Displays[] = {"WINDOW", "FULL"};
+static const char *const s_Shapes[] = {"4:3", "STRETCH", "16:9"};
+static const char *const s_Switches[] = {"OFF", "ON"};
+static const char *const s_Resolutions[] = {"PS1", "2X", "3X", "4X", "6X", "8X"};
 static const int s_Scales[] = {1, 2, 3, 4, 6, 8};
-static const char *const s_Steadiness[] = {"JITTERY", "STEADY"};
-static const char *const s_Perspectives[] = {"WARPED", "UNWARPED"};
-static const char *const s_FrameRates[] = {"30 FPS", "60 FPS"};
+static const char *const s_PlayStation[] = {"ON", "OFF"};
+static const char *const s_FrameRates[] = {"30", "60"};
 
 #define VALUE_COUNT(values) ((int)(sizeof(values) / sizeof((values)[0])))
 
 Setting g_Settings[SETTING_COUNT] = {
-    {"fullscreen", s_Displays, VALUE_COUNT(s_Displays), 0},
-    {"shape", s_Shapes, VALUE_COUNT(s_Shapes), 0},
-    {"smooth", s_Smoothing, VALUE_COUNT(s_Smoothing), 0},
-    {"resolution", s_Resolutions, VALUE_COUNT(s_Resolutions), 0},
-    {"steady", s_Steadiness, VALUE_COUNT(s_Steadiness), 0},
-    {"perspective", s_Perspectives, VALUE_COUNT(s_Perspectives), 0},
-    {"fps60", s_FrameRates, VALUE_COUNT(s_FrameRates), 0},
+    {"fullscreen", "SCREEN", s_Displays, VALUE_COUNT(s_Displays), 0},
+    {"shape", "SHAPE", s_Shapes, VALUE_COUNT(s_Shapes), 0},
+    {"smooth", "SMOOTH", s_Switches, VALUE_COUNT(s_Switches), 0},
+    {"resolution", "RES", s_Resolutions, VALUE_COUNT(s_Resolutions), 0},
+    {"steady", "WOBBLE", s_PlayStation, VALUE_COUNT(s_PlayStation), 0},
+    {"perspective", "WARPING", s_PlayStation, VALUE_COUNT(s_PlayStation), 0},
+    {"fps60", "FPS", s_FrameRates, VALUE_COUNT(s_FrameRates), 0},
 };
 
 _Static_assert(VALUE_COUNT(s_Scales) == VALUE_COUNT(s_Resolutions), "a scale for each resolution named");

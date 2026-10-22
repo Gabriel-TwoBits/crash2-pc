@@ -234,9 +234,10 @@ matching"):
      gamepads through SDL3.
 9. **Settings, in the game (done).** The port's options sit in the game's own menus, reached with the pad: OPTIONS, a
    third item on the title's menu, and PC OPTIONS in the pause menu's OPTIONS, before DONE. Either shows the settings in
-   the menu's place, in its font and look (a value between the font's arrows, as the pause menu's MONO and STEREO: its
-   rows hold some 12 characters), and DONE, triangle or circle go back. The settings' rows scroll under DONE, which
-   stays in view (4 rows on the title, 5 in the pause menu). The menu's own GOOL code moves the cursor, with its sounds;
+   the menu's place, in its font and look (each row its name and value between the font's arrows, "<FPS: 60>", as the
+   pause options' "<CTR: 0>"), and DONE, triangle or circle go back. The settings' rows scroll under DONE, which stays
+   in view (4 rows on the title, 5 in the pause menu, across all of its panel: the game leaves the paused picture above
+   it as it is, a text drawn there staying after it). The menu's own GOOL code moves the cursor, with its sounds;
    `src/menus.c` patches four words of each menu's code where the game loads it (TitOC's, and DispC's as the warp rooms
    and levels load it; the title's DispC is another entry), each an operation of the host's (decomp's
    `GOOL_HOST_OPERATION`) doing the replaced instruction's work besides its own, and only where each word holds that

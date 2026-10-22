@@ -80,11 +80,16 @@ enum {
 /* DONE's text, string 50 of the menus' animation; the status bit with which the menu leaves its rows' refresh */
 #define DONE_FRAME (50 * ITEM)
 #define REFRESH_STATUS 0x20
-/* The rows laid out as the pause options' own (item 2 at the menu's height), as many as the panel holds */
+/* The pause options' rows laid out as its own (item 2 at the menu's height), as many as the panel holds; the port's
+ * across all of the panel, the picture of Crash's face too, for their names and values. Not above the panel: the game
+ * leaves the paused picture as it is, and a text drawn there stays after it */
 #define PAUSE_MIDDLE_ROW 2
+#define PAUSE_FIRST_ROW_Y (PAUSE_MIDDLE_ROW * LINE)
+#define PAUSE_ROWS_MIDDLE (LINE * 13 / 4)
 #define PAUSE_VISIBLE_ROWS 5
 
-/* DispC's text object (SPAWN_FORCED, subtype 19, 6 arguments: item, animation, frame, 0, height, 0), the event a
+
+/* DispC's text object (SPAWN_FORCED, subtype 19, 6 arguments: item, animation, frame, across, height, 0), the event a
  * menu's texts end on, the title's tests of left and right pressed */
 #define SPAWN_TEXT 0x466044C1u
 #define TEXT_END_EVENT 0xC00
@@ -98,8 +103,8 @@ enum {
 #define ANIMATION_HEADER_BYTES 12
 #define ANIMATION_COUNT_OFFSET 2
 #define TEXT_BYTES 48
-/* A row's value between the font's arrows, as the pause menu's MONO and STEREO */
-#define VALUE_FORMAT "~sx800~<~sx400~%s~sx800~>"
+/* A row's name and value between the font's arrows, as the pause options' CTR */
+#define ROW_FORMAT "~sx800~<~sx400~%s: %s~sx800~>"
 #define ANIMATION_WORDS ((ANIMATION_HEADER_BYTES + TEXT_BYTES) / WORD_BYTES)
 #define ROWS_MAX (SETTING_COUNT + 1)
 /* Room for an event's arguments, none here (the game's events take up to 7) */
@@ -193,11 +198,12 @@ static void write_text(TextAnimation *animation, void *object, int word, const c
 }
 
 /* A text the menu's own code would spawn: its item, its animation's frame, its height */
-static void spawn_text(void *object, int32_t item, const void *animation, int32_t frame, int32_t height) {
+static void spawn_text(void *object, int32_t item, const void *animation, int32_t frame, int32_t across,
+                       int32_t height) {
     push(object, item);
     push(object, (int32_t)(uintptr_t)animation);
     push(object, frame);
-    push(object, 0);
+    push(object, across);
     push(object, height);
     push(object, 0);
     Gool_OpSpawn(object, SPAWN_TEXT);
@@ -238,17 +244,25 @@ static void write_row(void *object, int row) {
     } else {
         const Setting *setting = &g_Settings[s_RowSettings[row]];
 
-        snprintf(text, sizeof(text), VALUE_FORMAT, setting->values[setting->value]);
+        snprintf(text, sizeof(text), ROW_FORMAT, setting->label, setting->values[setting->value]);
     }
     write_text(&s_Rows[row], object, animation_word(), text);
 }
 
-/* A shown row's height by its place among the shown */
+/* A shown row's height by its place among the shown, and the rows' middle across */
 static int32_t row_height(int slot) {
     if (s_MenuKind == TITLE_ITEMS) {
         return TITLE_FIRST_ROW_Y - slot * LINE;
     } else {
-        return (slot - PAUSE_MIDDLE_ROW) * -LINE;
+        return PAUSE_FIRST_ROW_Y - slot * LINE;
+    }
+}
+
+static int32_t rows_middle(void) {
+    if (s_MenuKind == TITLE_ITEMS) {
+        return 0;
+    } else {
+        return PAUSE_ROWS_MIDDLE;
     }
 }
 
@@ -274,9 +288,9 @@ static void show_rows(void *object) {
     for (slot = 0; slot < visible_settings() && s_FirstRow + slot < done_row(); slot++) {
         int row = s_FirstRow + slot;
 
-        spawn_text(object, row * ITEM, &s_Rows[row], 0, row_height(slot));
+        spawn_text(object, row * ITEM, &s_Rows[row], 0, rows_middle(), row_height(slot));
     }
-    spawn_text(object, done_row() * ITEM, &s_Rows[done_row()], 0, row_height(slot));
+    spawn_text(object, done_row() * ITEM, &s_Rows[done_row()], 0, rows_middle(), row_height(slot));
 }
 
 /* The settings' rows shown moved to keep the cursor's in view (DONE always is) */
@@ -347,7 +361,7 @@ static void sides(void *object) {
 
 static void spawn_title_options(void *object) {
     write_text(&s_TitleOptions, object, TITLE_ANIMATION_WORD, "OPTIONS");
-    spawn_text(object, TITLE_OPTIONS_ITEM * ITEM, &s_TitleOptions, 0, -TITLE_OPTIONS_ITEM * LINE);
+    spawn_text(object, TITLE_OPTIONS_ITEM * ITEM, &s_TitleOptions, 0, 0, -TITLE_OPTIONS_ITEM * LINE);
 }
 
 /* The title menu's texts, as its own code spawns NEW GAME and LOAD GAME, and OPTIONS */
@@ -357,7 +371,7 @@ static void spawn_title_texts(void *object) {
     int item;
 
     for (item = 0; item < TITLE_OPTIONS_ITEM; item++) {
-        spawn_text(object, item * ITEM, animation, item * ITEM, -item * LINE);
+        spawn_text(object, item * ITEM, animation, item * ITEM, 0, -item * LINE);
     }
     spawn_title_options(object);
 }
@@ -448,7 +462,7 @@ static void pause_item(void *object) {
         /* Not open in this menu */
     }
     write_text(&s_PauseOptions, object, PAUSE_ANIMATION_WORD, "PC OPTIONS");
-    spawn_text(object, item, &s_PauseOptions, 0, (item / ITEM - PAUSE_MIDDLE_ROW) * -LINE);
+    spawn_text(object, item, &s_PauseOptions, 0, 0, (item / ITEM - PAUSE_MIDDLE_ROW) * -LINE);
     s_PauseItem = item;
     GOOL_REGISTER(object, ITEM_COUNT) = item + ITEM;
     GOOL_REGISTER(object, TEXT_FRAME) = DONE_FRAME;

@@ -16,8 +16,8 @@ enum {
 
 typedef struct {
     const char *key;           /* its name in settings.ini */
-    const char *const *values; /* its values' names on the options screen, in the game's font (capitals), a value
-                                * being its index */
+    const char *label;         /* its name on the options screen, in the game's font (capitals) */
+    const char *const *values; /* its values' names there, a value being its index */
     int count;
     int value;
 } Setting;
