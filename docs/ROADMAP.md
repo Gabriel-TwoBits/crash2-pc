@@ -105,9 +105,10 @@ matching"):
      took the program to 0x80796368, near the 8 MB `RAM_ADDRESS` tests for. Its Wayland window needs the 32-bit
      `libwayland-egl1` and `libwayland-cursor0` (README.md); without them it found no video device. X11 isn't built:
      its CMake finds no 32-bit `libX11.so`.
-   - **Run:** the Naughty Dog logo over its nebula, then the title screen with its menu, as the PlayStation shows them
-     (decomp's `tools/run_game.py`, `title_again`, side by side). Headless with the rasterizer, about 180 vertical
-     blanks a second.
+   - **Run:** the Naughty Dog logo over its nebula, Crash flying out at the title, the title screen with its menu as
+     the PlayStation shows it (decomp's `tools/run_game.py`, `title_again`), then the attract demo's river level with
+     its "DEMO" and timer, and back to the title. Headless with the rasterizer, about 180 vertical blanks a second; a
+     change to the GPU's code that names its constants leaves the frame at blank 3,000 the same to the byte.
    - **Left:** a frame-by-frame comparison with the PlayStation build on the game clock, the levels' pictures, speed.
 7. **Input, sound, saves.** The pad from SDL3's gamepads and keyboard, the SPU and libsnd's sequencer, the memory card
    in files.

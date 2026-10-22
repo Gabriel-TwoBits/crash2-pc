@@ -55,6 +55,10 @@ enum {
 };
 
 #define CMD_FILL 0x02
+#define CMD_POLYGON 0x20
+#define CMD_LINE 0x40
+#define CMD_RECT 0x60
+#define CMD_ENVIRONMENT 0xE0
 #define CMD_COPY 0x80
 #define CMD_LOAD 0xA0
 #define CMD_STORE 0xC0
@@ -81,6 +85,44 @@ enum {
 #define CLUT_X_MASK 0x3F
 #define CLUT_Y_SHIFT 6
 #define CLUT_Y_MASK 0x1FF
+/* A 4-bit texel: four to a VRAM halfword; an 8-bit one: two */
+#define TEXELS_4_PER_HALF 4
+#define TEXEL_4_BITS 4
+#define TEXEL_4_MASK 0xF
+#define TEXELS_8_PER_HALF 2
+#define TEXEL_8_BITS 8
+/* The texture window's fields (E2), 5 bits each in units of 8 texels */
+#define WINDOW_UNIT 8
+#define WINDOW_FIELD_MASK 0x1F
+#define WINDOW_MASK_Y_SHIFT 5
+#define WINDOW_OFFSET_X_SHIFT 10
+#define WINDOW_OFFSET_Y_SHIFT 15
+/* The drawing area's corners (E3, E4): x in 10 bits, then y in 9 */
+#define AREA_X_MASK 0x3FF
+#define AREA_Y_SHIFT 10
+#define AREA_Y_MASK 0x1FF
+/* The offset (E5): x and y in 11 bits each */
+#define OFFSET_FIELD_MASK 0x7FF
+/* The mask bits (E6) */
+#define MASK_SET 1
+#define MASK_CHECK 2
+/* A fill's corner: x in 16-pixel steps; its width rounded up to 16 */
+#define FILL_X_MASK 0x3F0
+#define FILL_WIDTH_MASK 0x3FF
+#define FILL_WIDTH_ROUND 0xF
+/* The dither matrix's side: an offset each pixel by its x and y modulo 4 */
+#define DITHER_SIDE 4
+#define DITHER_MASK (DITHER_SIDE - 1)
+/* Semi-transparency's 0 and 3 modes: half the sum, a quarter of the front */
+#define HALF_DIVISOR 2
+#define QUARTER_DIVISOR 4
+#define BITS_PER_BYTE 8
+/* The words of the commands of a fixed length: a rectangle's colour and corner before its texture and size */
+#define RECT_BASE_WORDS 2
+#define COPY_WORDS 4
+#define TRANSFER_WORDS 3
+#define FILL_WORDS 3
+#define ENVIRONMENT_WORDS 1
 
 enum {
     DEPTH_4 = 0,
@@ -121,10 +163,10 @@ static int s_Count;
 /* A CPU-to-VRAM transfer in progress (GP0 0xA0): its rectangle and the pixels left */
 static int s_LoadX, s_LoadY, s_LoadWidth, s_LoadHeight, s_LoadPixel, s_LoadPixels;
 
-static const int s_Dither[4][4] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
+static const int s_Dither[DITHER_SIDE][DITHER_SIDE] = {{-4, 0, -3, 1}, {2, -2, 3, -1}, {-3, 1, -4, 0}, {3, -1, 2, -2}};
 
 static int sign_extend(uint32_t value, int bits) {
-    int shift = (int)(sizeof(int) * 8) - bits;
+    int shift = (int)(sizeof(int) * BITS_PER_BYTE) - bits;
 
     return (int)(value << shift) >> shift;
 }
@@ -174,19 +216,21 @@ static uint16_t texel(const Paint *paint, int u, int v) {
 
     u &= BYTE_MASK;
     v &= BYTE_MASK;
-    u = (u & ~(s_State.window_mask_x * 8)) | ((s_State.window_offset_x & s_State.window_mask_x) * 8);
-    v = (v & ~(s_State.window_mask_y * 8)) | ((s_State.window_offset_y & s_State.window_mask_y) * 8);
+    u = (u & ~(s_State.window_mask_x * WINDOW_UNIT)) |
+        ((s_State.window_offset_x & s_State.window_mask_x) * WINDOW_UNIT);
+    v = (v & ~(s_State.window_mask_y * WINDOW_UNIT)) |
+        ((s_State.window_offset_y & s_State.window_mask_y) * WINDOW_UNIT);
     y = (s_State.texture_y + v) & VRAM_Y_MASK;
     switch (s_State.depth) {
     case DEPTH_4:
-        x = (s_State.texture_x + u / 4) & VRAM_X_MASK;
+        x = (s_State.texture_x + u / TEXELS_4_PER_HALF) & VRAM_X_MASK;
         word = g_Vram[y][x];
-        index = (word >> ((u & 3) * 4)) & 0xF;
+        index = (word >> ((u % TEXELS_4_PER_HALF) * TEXEL_4_BITS)) & TEXEL_4_MASK;
         return g_Vram[paint->clut_y][(paint->clut_x + index) & VRAM_X_MASK];
     case DEPTH_8:
-        x = (s_State.texture_x + u / 2) & VRAM_X_MASK;
+        x = (s_State.texture_x + u / TEXELS_8_PER_HALF) & VRAM_X_MASK;
         word = g_Vram[y][x];
-        index = (word >> ((u & 1) * 8)) & BYTE_MASK;
+        index = (word >> ((u % TEXELS_8_PER_HALF) * TEXEL_8_BITS)) & BYTE_MASK;
         return g_Vram[paint->clut_y][(paint->clut_x + index) & VRAM_X_MASK];
     default:
         x = (s_State.texture_x + u) & VRAM_X_MASK;
@@ -197,13 +241,13 @@ static uint16_t texel(const Paint *paint, int u, int v) {
 static int blend_channel(int back, int front) {
     switch (s_State.semi_mode) {
     case 0:
-        return (back + front) / 2;
+        return (back + front) / HALF_DIVISOR;
     case 1:
         return back + front > FIVE_BITS ? FIVE_BITS : back + front;
     case 2:
         return back - front < 0 ? 0 : back - front;
     default:
-        return back + front / 4 > FIVE_BITS ? FIVE_BITS : back + front / 4;
+        return back + front / QUARTER_DIVISOR > FIVE_BITS ? FIVE_BITS : back + front / QUARTER_DIVISOR;
     }
 }
 
@@ -247,7 +291,7 @@ static void plot(const Paint *paint, int x, int y, int r, int g, int b, int u, i
         blue = ((((source >> BLUE_SHIFT) & FIVE_BITS) << CHANNEL_SHIFT) * b) >> MODULATION_SHIFT;
     }
     if (paint->dithered && s_State.dither) {
-        int offset = s_Dither[y & 3][x & 3];
+        int offset = s_Dither[y & DITHER_MASK][x & DITHER_MASK];
 
         red += offset;
         green += offset;
@@ -456,7 +500,7 @@ static void single_line(const uint32_t *words) {
 static int rect_words(uint32_t command) {
     int size = (command >> RECT_SIZE_SHIFT) & RECT_SIZE_MASK;
 
-    return 2 + ((command & PRIMITIVE_TEXTURED) ? 1 : 0) + (size == 0 ? 1 : 0);
+    return RECT_BASE_WORDS + ((command & PRIMITIVE_TEXTURED) ? 1 : 0) + (size == 0 ? 1 : 0);
 }
 
 static void rect(const uint32_t *words) {
@@ -505,9 +549,9 @@ static void rect(const uint32_t *words) {
 
 static void fill(const uint32_t *words) {
     Vertex colour;
-    int left = (int)(words[1] & 0x3F0);
+    int left = (int)(words[1] & FILL_X_MASK);
     int top = (int)((words[1] >> HALF_SHIFT) & VRAM_Y_MASK);
-    int width = (int)(((words[2] & 0x3FF) + 0xF) & ~0xF);
+    int width = (int)(((words[2] & FILL_WIDTH_MASK) + FILL_WIDTH_ROUND) & ~FILL_WIDTH_ROUND);
     int height = (int)((words[2] >> HALF_SHIFT) & VRAM_Y_MASK);
     uint16_t pixel;
     int x, y;
@@ -567,20 +611,20 @@ void Gpu_SetDrawOffset(int x, int y) {
 
 /* The words a command takes, or 0 for a polyline (ended by its terminator) */
 static int command_words(uint32_t command) {
-    if (command >= 0x20 && command < 0x40) {
+    if (command >= CMD_POLYGON && command < CMD_LINE) {
         return polygon_words(command);
-    } else if (command >= 0x40 && command < 0x60) {
+    } else if (command >= CMD_LINE && command < CMD_RECT) {
         return (command & LINE_POLY) ? 0 : line_words(command);
-    } else if (command >= 0x60 && command < 0x80) {
+    } else if (command >= CMD_RECT && command < CMD_COPY) {
         return rect_words(command);
     } else if (command >= CMD_COPY && command < CMD_LOAD) {
-        return 4;
-    } else if (command >= CMD_LOAD && command < 0xE0) {
-        return 3;
+        return COPY_WORDS;
+    } else if (command >= CMD_LOAD && command < CMD_ENVIRONMENT) {
+        return TRANSFER_WORDS;
     } else if (command == CMD_FILL) {
-        return 3;
+        return FILL_WORDS;
     } else {
-        return 1;
+        return ENVIRONMENT_WORDS;
     }
 }
 
@@ -594,26 +638,26 @@ static void environment(uint32_t word) {
         s_State.flip_y = (word & TPAGE_FLIP_Y) != 0;
         break;
     case CMD_TEXTURE_WINDOW:
-        s_State.window_mask_x = word & 0x1F;
-        s_State.window_mask_y = (word >> 5) & 0x1F;
-        s_State.window_offset_x = (word >> 10) & 0x1F;
-        s_State.window_offset_y = (word >> 15) & 0x1F;
+        s_State.window_mask_x = word & WINDOW_FIELD_MASK;
+        s_State.window_mask_y = (word >> WINDOW_MASK_Y_SHIFT) & WINDOW_FIELD_MASK;
+        s_State.window_offset_x = (word >> WINDOW_OFFSET_X_SHIFT) & WINDOW_FIELD_MASK;
+        s_State.window_offset_y = (word >> WINDOW_OFFSET_Y_SHIFT) & WINDOW_FIELD_MASK;
         break;
     case CMD_AREA_TOP_LEFT:
-        s_State.area_left = word & 0x3FF;
-        s_State.area_top = (word >> 10) & 0x1FF;
+        s_State.area_left = word & AREA_X_MASK;
+        s_State.area_top = (word >> AREA_Y_SHIFT) & AREA_Y_MASK;
         break;
     case CMD_AREA_BOTTOM_RIGHT:
-        s_State.area_right = word & 0x3FF;
-        s_State.area_bottom = (word >> 10) & 0x1FF;
+        s_State.area_right = word & AREA_X_MASK;
+        s_State.area_bottom = (word >> AREA_Y_SHIFT) & AREA_Y_MASK;
         break;
     case CMD_OFFSET:
-        s_State.offset_x = sign_extend(word & 0x7FF, COORDINATE_BITS);
-        s_State.offset_y = sign_extend((word >> COORDINATE_BITS) & 0x7FF, COORDINATE_BITS);
+        s_State.offset_x = sign_extend(word & OFFSET_FIELD_MASK, COORDINATE_BITS);
+        s_State.offset_y = sign_extend((word >> COORDINATE_BITS) & OFFSET_FIELD_MASK, COORDINATE_BITS);
         break;
     case CMD_MASK:
-        s_State.set_mask = (word & 1) != 0;
-        s_State.check_mask = (word & 2) != 0;
+        s_State.set_mask = (word & MASK_SET) != 0;
+        s_State.check_mask = (word & MASK_CHECK) != 0;
         break;
     default:
         /* nop, cache clear, interrupt request: nothing drawn */
@@ -624,11 +668,11 @@ static void environment(uint32_t word) {
 static void execute(const uint32_t *words) {
     uint32_t command = words[0] >> COMMAND_SHIFT;
 
-    if (command >= 0x20 && command < 0x40) {
+    if (command >= CMD_POLYGON && command < CMD_LINE) {
         polygon(words);
-    } else if (command >= 0x40 && command < 0x60) {
+    } else if (command >= CMD_LINE && command < CMD_RECT) {
         single_line(words);
-    } else if (command >= 0x60 && command < 0x80) {
+    } else if (command >= CMD_RECT && command < CMD_COPY) {
         rect(words);
     } else if (command >= CMD_COPY && command < CMD_LOAD) {
         Gpu_MoveImage(words[1] & VRAM_X_MASK, (words[1] >> HALF_SHIFT) & VRAM_Y_MASK,
@@ -641,7 +685,7 @@ static void execute(const uint32_t *words) {
         s_LoadHeight = (((words[2] >> HALF_SHIFT) - 1) & VRAM_Y_MASK) + 1;
         s_LoadPixel = 0;
         s_LoadPixels = s_LoadWidth * s_LoadHeight;
-    } else if (command >= CMD_STORE && command < 0xE0) {
+    } else if (command >= CMD_STORE && command < CMD_ENVIRONMENT) {
         /* VRAM to the CPU: StoreImage reads VRAM itself */
     } else if (command == CMD_FILL) {
         fill(words);
