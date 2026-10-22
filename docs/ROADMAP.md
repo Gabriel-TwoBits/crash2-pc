@@ -140,7 +140,7 @@ matching"):
      scratchpad at a 1 KB boundary, so the game's alignments of their addresses come out the same (`Gfx_OpenVideo`'s
      buffer padding, 4 bytes apart before).
    - **Left:** the CD's timing, for whole runs to stay together; speed.
-7. **Input, sound, saves (in progress).**
+7. **Input, sound, saves (done).**
    - **Input (done):** `src/input.c` reads the keyboard and the first gamepad through SDL3, and `src/psyq/pad.c`
      writes them into the pad's buffer at each vertical blank: a digital pad's buttons, 0 while pressed, in psx-spx's
      order. Without a window, no button is pressed.
@@ -170,5 +170,16 @@ matching"):
      the notes on one side only. A libsnd written for the host from psx-spx's formats, with its formulas measured on the
      PS1, had 748 of 1,876 aligned notes differing (voices stolen by another rule, a tick's rounding): `src/sdk.c`
      replaced it.
-   - **Left:** the memory card in files.
+   - **Memory card (done):** `src/psyq/card.c` keeps port 1's card in a 128 KB image (the emulators' .mcd), written
+     through frame by frame, a missing one a formatted empty card. On it, the BIOS's file functions on "bu00:" (open,
+     with create by blocks, read and write by 128-byte frames, close, erase, format, firstfile and nextfile) and
+     libcard's calls, as psx-spx documents them: the directory in block 0, a file in 8 KB blocks chained from its first;
+     the card new after power-on until its first write, `_new_card` passing the next frame's access; the events at once.
+     A name of 20 characters fills DIRENTRY's name, the game reading on to the attribute's first byte, which stays 0
+     (truncated to 19, the saved game couldn't be read back). Against the PS1, with run_game's memory-card schedule's
+     presses on the game clock (`CRASH2_GAME_CLOCK_PRESSES`): both save one file of one block, and the two cards differ
+     in 4 of 1,024 frames, none of them the format's: the file name's random digits and its entry's checksum, 15 bytes
+     of the saved game's own state, which two PS1 runs save alike and the port's run, unpaced, saves otherwise, and the
+     write-test frame, where the emulator's BIOS writes its buffer at `_card_clear`. Run again on that card, the port
+     lists the save in Load Game.
 8. **Windows.** The same build for 32-bit Windows.

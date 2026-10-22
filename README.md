@@ -13,8 +13,8 @@ sound, the CD, the memory card and the pad.
 ## Status
 
 The game's C runs on the PC from the disc image, in a window drawn by a GPU in software: the Naughty Dog logo, the
-title screen, the attract demo, and the game from the keyboard or a gamepad, with its sound effects and music. There
-is no memory card yet. The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
+title screen, the attract demo, and the game from the keyboard or a gamepad, with its sound effects and music, and its
+saves on a memory card in a file. The plan and its milestones are in [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it's built
 
@@ -62,6 +62,9 @@ What the split and the build make from your executable stays in `decomp/` (ignor
 | Select | Backspace | back |
 | L1, R1 | A, S | shoulders |
 | L2, R2 | Q, W | triggers |
+
+The memory card is `memcard1.mcd` in SDL's preference folder (on Linux, under `~/.local/share`): a 128 KB card image,
+the format emulators and card tools use, so a save moves between them. `CRASH2_MEMORY_CARD=FILE` uses another.
 
 ## How it's made: AI-assisted
 

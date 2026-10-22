@@ -41,6 +41,11 @@ for 32-bit x86: Debian's i386 package conflicts with backports' Mesa.
   port's `CRASH2_HEADLESS=1 CRASH2_GAME_CLOCK=DIR CRASH2_GAME_CLOCK_LAST=N CRASH2_GAME_CLOCK_DUMPS=N build/crash2
   DISC.cue` dumps its own, and `tools/compare_ram.py PS1.bin DIR/ram_N.bin build/crash2 decomp` names the variables
   that differ.
+- Presses on the game clock: `CRASH2_GAME_CLOCK_PRESSES=FILE` takes a run_game schedule's press lines (decomp's
+  `build/run_game/NAME/schedule.txt`), so the port plays the PS1's run. The memory card against the PS1: decomp's
+  `tools/run_game.py DISC.cue --schedule memory-card --against retail` saves on an empty card
+  (`build/run_game/retail/memcard1.mcd`); the port with that schedule's presses and `CRASH2_MEMORY_CARD=FILE` on a new
+  file (3,500 game frames) saves its own, to compare frame by frame.
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.

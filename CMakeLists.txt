@@ -95,7 +95,7 @@ add_executable(crash2
     src/psyq/libgte.c
     src/psyq/pad.c
     src/psyq/stubs.c
-    src/psyq/bios_files.c
+    src/psyq/card.c
     $<TARGET_OBJECTS:game>)
 # Position-independent code: the C library's variables (stderr) stay in it, where a copy in the program's bss would sit
 # among the game's
@@ -111,7 +111,7 @@ set_source_files_properties(src/psyq/libgte.c PROPERTIES
     COMPILE_OPTIONS "-std=gnu89;-w;-DGTE_MODEL;-include;${CMAKE_SOURCE_DIR}/src/host.h")
 set_target_properties(crash2 PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
 # At the PlayStation's RAM, 0x80000000 (src/host.h), and not position-independent: the game's data holds absolute
-# addresses. The BIOS's file calls go to src/psyq/bios_files.c
+# addresses. The BIOS's file calls go to src/psyq/card.c
 target_link_options(crash2 PRIVATE -no-pie -Wl,-Ttext-segment=0x80000000 -Wl,-T,${CMAKE_SOURCE_DIR}/cmake/game_data.ld
     -Wl,--wrap=open -Wl,--wrap=read -Wl,--wrap=write -Wl,--wrap=close)
 add_custom_command(TARGET crash2 POST_BUILD
