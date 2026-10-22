@@ -65,7 +65,7 @@ matching"):
    - **Pad:** `src/psyq/pad.c` fills `InitPAD`'s buffers at each vertical blank, as the BIOS does: a digital pad with no
      button pressed in port 1, none in port 2. Left zeroed, they read as a pad with every button held, and the game
      stayed on its first screen (level 60).
-5. **The native code (in progress).** `src/native.c` interprets the 32 instructions the GOOL entries' native blocks
+5. **The native code (done).** `src/native.c` interprets the 32 instructions the GOOL entries' native blocks
    use, on the registers decomp's `gool_native` sets. As on the R3000, a branch runs its delay slot, a load's register
    takes its value one instruction late, and a division by 0 leaves the CPU's results.
    - **Null pointers:** the PlayStation reads and writes its first 64 KB, the kernel's RAM, where Linux maps no page.
@@ -79,7 +79,13 @@ matching"):
      the x86 doesn't keep. Fixed there (`PASSED_ON`, decomp/docs/ROADMAP.md section 6, "The macros").
    - **Debugging:** `CRASH2_SAMPLE` samples where the program spends its time (`src/sampler.c`); a fatal error
      aborts, its core dump read back by gdb. A live gdb can't follow the game past the low RAM's single steps.
-   - **Left:** a differential test of the interpreter against an emulator, on the disc's blocks.
+   - **Test:** with `CRASH2_NATIVE_TRACE=FILE`, the interpreter writes each block's runs: its registers on entry,
+     fetches, loads and stores with their values, and its registers at the end, each block's first 16 runs.
+     `tools/check_native.py` replays them on Unicorn's MIPS (`tools/requirements.txt`), from the values the run found
+     in memory, and compares the registers and the stored memory. On the title and attract demo (60 seconds), all
+     10,041 runs agree: 669 of the 1,406 distinct blocks, by 900 paths. With `slt` made unsigned on purpose, 33 of 5,544
+     differ.
+   - **Left:** the blocks no demo level runs, with the levels played.
 6. **The picture.** The GTE's register moves on the host, the GPU's packets rasterized into VRAM, the display shown:
    the title screen, compared with the PlayStation build in an emulator.
 7. **Input, sound, saves.** The pad from SDL3's gamepads and keyboard, the SPU and libsnd's sequencer, the memory card

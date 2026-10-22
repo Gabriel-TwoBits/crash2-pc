@@ -1,0 +1,2 @@
+# tools/check_native.py: the emulator it replays the native code on
+unicorn==2.1.4
