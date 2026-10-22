@@ -1,13 +1,20 @@
 #!/bin/sh
 # Runs build-linux/crash2-pc-linux.AppImage in a 64-bit system with no 32-bit library (tools/linux/Containerfile's
-# test stage, built here the first time), for the same checks as the build's own runs (CLAUDE.md, "Running and
-# testing"):
-#   tools/linux/run.sh [--window] DISC.cue OUT [NAME=VALUE ...]
-# Headless, or with --window in a window on Xvfb's virtual display. The disc's folder is mounted read-only at /disc,
-# OUT at /out; each NAME=VALUE goes to the program's environment (CRASH2_GAME_CLOCK=/out). The container has no FUSE:
-# the AppImage extracts itself and runs.
+# test stage, built here), for the same checks as the build's own runs (CLAUDE.md, "Running and testing"):
+#   tools/linux/run.sh [--gpu] [--window] DISC.cue OUT [NAME=VALUE ...]
+# Headless, or with --window in a window on Xvfb's virtual display; with --gpu in the test-gpu stage, which adds
+# 32-bit Vulkan for the GPU renderer. The disc's folder is mounted read-only at /disc, OUT at /out; each NAME=VALUE
+# goes to the program's environment (CRASH2_GAME_CLOCK=/out). The container has no FUSE: the AppImage extracts itself
+# and runs.
 set -eu
 
+STAGE=test
+if [ "${1:-}" = "--gpu" ]; then
+    STAGE=test-gpu
+    shift
+else
+    : # The system with no 32-bit library
+fi
 if [ "${1:-}" = "--window" ]; then
     LAUNCH="xvfb-run -a"
     HEADLESS=""
@@ -17,7 +24,7 @@ else
     HEADLESS="--env CRASH2_HEADLESS=1"
 fi
 if [ $# -lt 2 ]; then
-    sed -n '5,9p' "$0"
+    sed -n '4,9p' "$0"
     exit 2
 else
     DISC=$(cd "$(dirname "$1")" && pwd)
@@ -25,13 +32,10 @@ else
     OUT=$(mkdir -p "$2" && cd "$2" && pwd)
     shift 2
 fi
-IMAGE=crash2-pc-linux-test
+IMAGE=crash2-pc-linux-$STAGE
 ENGINE=$(command -v podman || command -v docker)
-if ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
-    "$ENGINE" build --target test -t "$IMAGE" -f tools/linux/Containerfile tools/linux
-else
-    echo "$IMAGE: built already" >&2
-fi
+# Built each time, so a changed Containerfile takes effect (the layers' cache keeps it quick)
+"$ENGINE" build --target "$STAGE" -t "$IMAGE" -f tools/linux/Containerfile tools/linux
 ENVIRONMENT=""
 for setting in "$@"; do
     ENVIRONMENT="$ENVIRONMENT --env $setting"

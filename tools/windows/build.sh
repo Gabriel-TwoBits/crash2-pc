@@ -1,19 +1,16 @@
 #!/bin/sh
-# Builds the Windows program in the Windows build's container (tools/windows/Containerfile, built here the first
-# time): MinGW-w64's 32-bit GCC through cmake/mingw-i686.cmake, into build-windows/ (crash2.exe, which loads
-# crash2-game.dll, with SDL3.dll beside them), then build-windows/crash2-pc-windows.zip: the three stripped of their
-# debugging symbols, with the licences (the port's and SwanStation's GPL-3.0, SDL's zlib licence) and the README.
-# Run from the repository's root, once the decompilation is split (README.md, "Building"); podman or docker.
+# Builds the Windows program in the Windows build's container (tools/windows/Containerfile, built here): MinGW-w64's
+# 32-bit GCC through cmake/mingw-i686.cmake, into build-windows/ (crash2.exe, which loads crash2-game.dll, with SDL3.dll
+# beside them), then build-windows/crash2-pc-windows.zip: the three stripped of their debugging symbols, with the
+# licences (the port's and SwanStation's GPL-3.0, SDL's zlib licence) and the README. Run from the repository's root,
+# once the decompilation is split (README.md, "Building"); podman or docker.
 set -eu
 
 IMAGE=crash2-pc-windows
 ENGINE=$(command -v podman || command -v docker)
 
-if ! "$ENGINE" image exists "$IMAGE" 2>/dev/null && ! "$ENGINE" image inspect "$IMAGE" >/dev/null 2>&1; then
-    "$ENGINE" build -t "$IMAGE" -f tools/windows/Containerfile tools/windows
-else
-    echo "$IMAGE: built already"
-fi
+# Built each time, so a changed Containerfile takes effect (the layers' cache keeps it quick)
+"$ENGINE" build -t "$IMAGE" -f tools/windows/Containerfile tools/windows
 "$ENGINE" run --rm -v "$PWD":/project -w /project "$IMAGE" sh -c '
     set -eu
     cmake -S . -B build-windows -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/mingw-i686.cmake
