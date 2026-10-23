@@ -327,7 +327,11 @@ matching"):
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
     words where `func_80024658` writes 8, the retail frame's spare words under them, the host's frame the player's
-    position (crash2-decomp 5a565c4). The decompilation's PCSX-Redux runs don't follow such a recording (the
+    position (crash2-decomp 5a565c4). The same, found by reading: four callers gave `Ent_GetProperty`'s interpolated
+    row a word where the retail frames hold two and the row takes up to 8 bytes; in `func_800224A0` (the camera's pull
+    on Z, where its path has property 0x252) the host's frame put `new_var` on the row's third value, so `scale` was
+    always the second's low half (crash2-decomp f375744). The demo's, the card's and the Snow Go run's frames, sound
+    and card are the same with it: none of them reaches the property. The decompilation's PCSX-Redux runs don't follow such a recording (the
     PlayStation's disc reads in real time move its game frames from the opening's screens on). Open: some textures
     flicker, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off, not yet told
     apart between the GPU renderer and the steady polygons (RES PS1, then WOBBLE and WARPING on), nor recorded.
