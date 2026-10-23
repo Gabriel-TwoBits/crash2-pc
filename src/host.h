@@ -55,6 +55,10 @@ long long Host_Horizontal(long long offset);
 #define GTE_PROJECTED(sxy, view, h, ofx, ofy) Host_GteProjected((sxy), (const long long *)(view), (h), (ofx), (ofy))
 void Host_GteProjected(unsigned int sxy, const long long *view, unsigned int h, int ofx, int ofy);
 
+/* A path where the PlayStation's code reads what its callers left, which the C has no value for (host_log.c) */
+#define CALLER_LEFT(function) Host_CallerLeft(#function)
+void Host_CallerLeft(const char *function);
+
 /* The operations of the host's patches of the game's GOOL code (menus.c) */
 #define GOOL_HOST_OPERATION Host_GoolOperation
 void Host_GoolOperation(struct GoolObject *object, unsigned int word);
