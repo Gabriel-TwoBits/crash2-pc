@@ -51,7 +51,8 @@ void Host_PadVerticalBlank(void) {
     if (!s_Started || s_Port1 == NULL || s_Port1Bytes < PAD_DIGITAL_BYTES) {
         return;
     } else {
-        unsigned int released = ~(Host_InputButtons() | Host_ClockButtons());
+        /* The game clock's buttons alone while it runs, its schedule's or the player's read once a game frame */
+        unsigned int released = ~(Host_GameClock() ? Host_ClockButtons() : Host_InputButtons());
 
         s_Port1[PAD_STATUS] = PAD_CONNECTED;
         s_Port1[PAD_KIND] = PAD_DIGITAL;

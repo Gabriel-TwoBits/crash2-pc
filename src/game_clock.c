@@ -24,7 +24,10 @@
  * CRASH2_GAME_CLOCK_LAST=N ends the run after game frame N; CRASH2_GAME_CLOCK_SHOTS=N,M,... writes those game frames'
  * images as DIR/shot_N.ppm, run_game.lua's shots (and the GPU renderer's at its resolution as DIR/shot_N_gpu.ppm when
  * it draws), and CRASH2_GAME_CLOCK_DUMPS=N,M,... the game's data and bss as DIR/ram_N.bin, a 2 MB image of the RAM at
- * the retail addresses (the rest zero), to compare with run_game.lua's RAM dumps */
+ * the retail addresses (the rest zero), to compare with run_game.lua's RAM dumps.
+ * CRASH2_GAME_CLOCK_RECORD=FILE records a player's run as a schedule CRASH2_GAME_CLOCK_PRESSES plays back: the pad
+ * read once a game frame (as the schedule's presses are held) and each button's holds written as press lines, so the
+ * same game frames run again headless */
 
 #define CLOCK_VARIABLE "CRASH2_GAME_CLOCK"
 #define LAST_VARIABLE "CRASH2_GAME_CLOCK_LAST"
@@ -38,7 +41,9 @@
 /* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
  * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
 #define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
-#define PRESSES_MAX 256
+#define RECORD_VARIABLE "CRASH2_GAME_CLOCK_RECORD"
+#define PRESSES_GROWTH 256
+#define NOT_HELD (-1)
 #define LINE_BYTES 256
 #define PRESS_COMMAND "press "
 /* A button's name, at most BUTTON_NAME_BYTES with its end, and the scan of a press line's fields after the command */
@@ -78,9 +83,13 @@ typedef struct {
     unsigned int button;
 } Press;
 
-static Press s_Presses[PRESSES_MAX];
+static Press *s_Presses;
 static int s_PressCount;
+static int s_PressRoom;
 static unsigned int s_Held;
+/* The run being recorded, and the game frame each button's hold began in (NOT_HELD if it isn't held) */
+static FILE *s_Record;
+static int s_HeldFrom[sizeof(unsigned int) * 8];
 
 /* PCSX.CONSTS.PAD.BUTTON's names, which run_game.lua's schedules use */
 static const struct {
@@ -121,8 +130,16 @@ static void read_presses(const char *path) {
             if (strncmp(line, PRESS_COMMAND, strlen(PRESS_COMMAND)) != 0) {
                 continue;
             } else if (sscanf(line + strlen(PRESS_COMMAND), PRESS_FORMAT, &press.first, &press.last, name) !=
-                       PRESS_FIELDS || s_PressCount >= PRESSES_MAX) {
+                       PRESS_FIELDS) {
                 Host_Fatal("%s: a press line it can't take: %s", PRESSES_VARIABLE, line);
+            } else if (s_PressCount == s_PressRoom) {
+                s_PressRoom += PRESSES_GROWTH;
+                s_Presses = realloc(s_Presses, sizeof(s_Presses[0]) * (size_t)s_PressRoom);
+            } else {
+                /* Room for it */
+            }
+            if (s_Presses == NULL) {
+                Host_Fatal("%s: no memory for its presses", PRESSES_VARIABLE);
             } else {
                 press.button = button_named(name);
                 s_Presses[s_PressCount++] = press;
@@ -149,6 +166,57 @@ static unsigned int held_in(int frame) {
 
 unsigned int Host_ClockButtons(void) {
     return s_Held;
+}
+
+/* A button's index among the pad's bits */
+static int bit_of(unsigned int button) {
+    int bit = 0;
+
+    while (button > 1) {
+        button >>= 1;
+        bit++;
+    }
+    return bit;
+}
+
+/* The buttons held for a game frame: each hold begun or ended, an ended one written as a press line */
+static void record(unsigned int buttons, int frame) {
+    size_t index;
+
+    for (index = 0; index < sizeof(s_ButtonNames) / sizeof(s_ButtonNames[0]); index++) {
+        int bit = bit_of(s_ButtonNames[index].button);
+        int held = (buttons & s_ButtonNames[index].button) != 0;
+
+        if (held && s_HeldFrom[bit] == NOT_HELD) {
+            s_HeldFrom[bit] = frame;
+        } else if (!held && s_HeldFrom[bit] != NOT_HELD) {
+            fprintf(s_Record, "%s%d %d %s\n", PRESS_COMMAND, s_HeldFrom[bit], frame - 1, s_ButtonNames[index].name);
+            s_HeldFrom[bit] = NOT_HELD;
+        } else {
+            /* Held on, or not held */
+        }
+    }
+    fflush(s_Record);
+}
+
+/* At the program's end, the holds still going written to their last game frame */
+static void end_record(void) {
+    record(0, s_GameFrame + 1);
+    fclose(s_Record);
+}
+
+static void start_record(const char *path) {
+    size_t bit;
+
+    s_Record = fopen(path, "w");
+    if (s_Record == NULL) {
+        Host_Fatal("%s: can't write %s", RECORD_VARIABLE, path);
+    } else {
+        for (bit = 0; bit < sizeof(s_HeldFrom) / sizeof(s_HeldFrom[0]); bit++) {
+            s_HeldFrom[bit] = NOT_HELD;
+        }
+        atexit(end_record);
+    }
 }
 
 /* The split's first data symbol: the retail data's start, where tools/check_layout.py keeps the rest after it */
@@ -184,6 +252,8 @@ static void start(void) {
     s_ObjectCount = frame_list(getenv(OBJECTS_VARIABLE), s_Objects);
     if (getenv(PRESSES_VARIABLE) != NULL) {
         read_presses(getenv(PRESSES_VARIABLE));
+    } else if (getenv(RECORD_VARIABLE) != NULL) {
+        start_record(getenv(RECORD_VARIABLE));
     } else {
         /* No presses */
     }
@@ -354,7 +424,12 @@ void Host_FrameEnding(void) {
     s_GameFrame++;
     g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);
     /* As run_game.lua's: the presses apply to the game frame after the one ending */
-    s_Held = held_in(s_GameFrame + 1);
+    if (s_Record != NULL) {
+        s_Held = Host_InputButtons();
+        record(s_Held, s_GameFrame + 1);
+    } else {
+        s_Held = held_in(s_GameFrame + 1);
+    }
     if (s_LastFrame >= 0 && s_GameFrame > s_LastFrame) {
         fclose(s_Frames);
         Host_Log("game clock: %d game frames written", s_GameFrame);

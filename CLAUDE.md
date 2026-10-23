@@ -59,7 +59,12 @@ is shows it by the same `game_frames.txt` hashes as before.
   `DIR/objects_N.txt` (GOOL entry, subtype, state, the code word the pc is at, position and velocity), to find the
   object a change concerns or follow one (Crash is `WillC`). `fps60=1` in a `CRASH2_SETTINGS` file draws a frame
   between each two of the game's: the game's own frames and state stay those of a run without it (the frames between
-  count none). `CRASH2_DUMP=DIR CRASH2_DUMP_EVERY=1 CRASH2_DUMP_FROM=N` writes each picture shown from blank N.
+  count none). `CRASH2_DUMP=DIR CRASH2_DUMP_EVERY=1 CRASH2_DUMP_FROM=N` writes each picture shown from blank N (a
+  picture 0.4 MB: a narrow window of blanks, out of a tmpfs).
+- A player's run played again: `CRASH2_GAME_CLOCK=DIR CRASH2_GAME_CLOCK_RECORD=FILE` in the window (with
+  `CRASH2_MEMORY_CARD` on a new file, the settings unchanged during the run) records the pad, read once a game frame,
+  as press lines; `CRASH2_GAME_CLOCK_PRESSES=FILE` headless, with the same settings and a new card, runs the same game
+  frames (a windowed run of a schedule writes the same `game_frames.txt` as a headless one).
 - The sound against the PS1: `tools/spu_log.lua` in decomp's PCSX-Redux logs the PS1's SPU register writes (its header
   has the command), `CRASH2_SPU_LOG=FILE` the port's, and `tools/compare_spu.py PS1.log PORT.log --voices 16` aligns
   their notes and lists each note missing on one side or differing.
