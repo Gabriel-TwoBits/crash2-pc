@@ -289,6 +289,8 @@ matching"):
     the projection); objects the game culls by its own 4:3 bounds would come in late at the edges, none seen so far.
     The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
     plays the same frames as before. The software picture narrows too.
+    - **Zoomed:** the shape's fourth value, ZOOM, shows the 4:3 picture's middle three quarters of its height at
+      16:9, its top and bottom cut: no wider view, no edges.
     - **The world beside the view, tried and dropped:** the game draws only the polygons its camera path's sort list
       (SLST) holds at the camera's node, made for 4:3, so at 16:9 the world comes and goes at the edges. A host's list
       (`WORLD_SORT_LIST`, with larger frame buffers through `FRAME_PRIMITIVES_ALLOC`, crash2-decomp a3ccf38) added

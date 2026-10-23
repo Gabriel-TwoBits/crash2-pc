@@ -1068,10 +1068,11 @@ static void upload_picture(SDL_GPUCommandBuffer *command, int width, int height,
     SDL_EndGPUCopyPass(copy);
 }
 
-/* The window's viewport for the picture: 4:3 (or 16:9 for the wide view) in the middle, or all of it stretched */
+/* The window's viewport for the picture: 4:3 (or 16:9 for the wide view and the zoomed one) in the middle, or all of
+ * it stretched */
 static SDL_GPUViewport viewport(Uint32 width, Uint32 height) {
     SDL_GPUViewport result;
-    int wide = g_Settings[SETTING_SHAPE].value == SHAPE_WIDE;
+    int wide = g_Settings[SETTING_SHAPE].value == SHAPE_WIDE || g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED;
     Uint32 aspect_width = wide ? WIDE_ASPECT_WIDTH : ASPECT_WIDTH;
     Uint32 aspect_height = wide ? WIDE_ASPECT_HEIGHT : ASPECT_HEIGHT;
 
@@ -1129,6 +1130,15 @@ void Render_Present(int x, int y, int width, int height, int enabled, const uint
         rectangle[1] = 0.0f;
         rectangle[2] = (float)width / PICTURE_WIDTH;
         rectangle[3] = (float)height / PICTURE_HEIGHT;
+    }
+    if (g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED) {
+        /* The middle of the picture's height */
+        float shown = rectangle[3] * ZOOM_SHOWN_NUMERATOR / ZOOM_SHOWN_DENOMINATOR;
+
+        rectangle[1] += (rectangle[3] - shown) * HALF;
+        rectangle[3] = shown;
+    } else {
+        /* All of it */
     }
     source.sampler = g_Settings[SETTING_SMOOTH].value ? s_Linear : s_Nearest;
     if (s_Window != NULL &&

@@ -22,12 +22,17 @@ typedef struct {
     int value;
 } Setting;
 
-/* The picture's shapes: the PlayStation's 4:3, that stretched to the window, and a wider view at 16:9 */
+/* The picture's shapes: the PlayStation's 4:3, that stretched to the window, a wider view at 16:9, and the 4:3
+ * picture zoomed to fill 16:9, its top and bottom cut */
 enum {
     SHAPE_4_3,
     SHAPE_STRETCHED,
-    SHAPE_WIDE
+    SHAPE_WIDE,
+    SHAPE_ZOOMED
 };
+/* The share of the picture's height the zoomed shape shows, the middle of it: 16:9 out of 4:3 */
+#define ZOOM_SHOWN_NUMERATOR 3
+#define ZOOM_SHOWN_DENOMINATOR 4
 
 extern Setting g_Settings[SETTING_COUNT];
 

@@ -97,7 +97,7 @@ in `settings.ini` beside the memory card:
 | Row | What it does |
 | --- | --- |
 | SCREEN | the window, or the full screen |
-| SHAPE | the picture at 4:3, stretched to the window, or 16:9, which shows more of the world across |
+| SHAPE | 4:3, stretched to the window, 16:9 (wider; the world comes and goes at its edges) or ZOOM (4:3 cut to 16:9) |
 | SMOOTH | the picture's pixels sharp, or smoothed |
 | RES | the resolution: the PlayStation's, or 2 to 8 times it, in true colour |
 | WOBBLE | the PlayStation's polygons snapped to whole pixels, so they shake as they move; off, they glide |

@@ -19,7 +19,7 @@
 /* The options screen's names, short: a row shows "<NAME: VALUE>" in some 16 characters. Wobble and warping are the
  * PlayStation's polygons' jitter and its textures' warping, on as it draws them */
 static const char *const s_Displays[] = {"WINDOW", "FULL"};
-static const char *const s_Shapes[] = {"4:3", "STRETCH", "16:9"};
+static const char *const s_Shapes[] = {"4:3", "STRETCH", "16:9", "ZOOM"};
 static const char *const s_Switches[] = {"OFF", "ON"};
 static const char *const s_Resolutions[] = {"PS1", "2X", "3X", "4X", "6X", "8X"};
 static const int s_Scales[] = {1, 2, 3, 4, 6, 8};

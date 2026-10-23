@@ -33,8 +33,9 @@
 /* The picture's 4:3, as a 640 by 480 canvas the window letterboxes */
 #define LOGICAL_WIDTH 640
 #define LOGICAL_HEIGHT 480
-/* The wide view's 16:9 */
+/* The wide and the zoomed views' 16:9 */
 #define WIDE_LOGICAL_HEIGHT 360
+#define HALF 0.5f
 #define MAX_DISPLAY_WIDTH 640
 #define MAX_DISPLAY_HEIGHT 512
 #define PIXELS_MAX (VRAM_WIDTH * VRAM_HEIGHT)
@@ -133,9 +134,9 @@ void Host_ApplySettings(void) {
     } else if (g_Settings[SETTING_SHAPE].value == SHAPE_STRETCHED) {
         shape = SDL_LOGICAL_PRESENTATION_STRETCH;
     } else {
-        /* 4:3 or 16:9, letterboxed */
+        /* 4:3 or 16:9 (wider or zoomed), letterboxed */
     }
-    if (g_Settings[SETTING_SHAPE].value == SHAPE_WIDE) {
+    if (g_Settings[SETTING_SHAPE].value == SHAPE_WIDE || g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED) {
         SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, WIDE_LOGICAL_HEIGHT, shape);
     } else {
         SDL_SetRenderLogicalPresentation(s_Renderer, LOGICAL_WIDTH, LOGICAL_HEIGHT, shape);
@@ -215,7 +216,17 @@ static void show(int width, int height) {
     SDL_UpdateTexture(s_Texture, NULL, s_Pixels, width * (int)sizeof(uint32_t));
     SDL_SetRenderDrawColor(s_Renderer, 0, 0, 0, SDL_ALPHA_OPAQUE);
     SDL_RenderClear(s_Renderer);
-    SDL_RenderTexture(s_Renderer, s_Texture, NULL, NULL);
+    if (g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED) {
+        SDL_FRect shown;
+
+        shown.w = (float)width;
+        shown.h = (float)height * ZOOM_SHOWN_NUMERATOR / ZOOM_SHOWN_DENOMINATOR;
+        shown.x = 0.0f;
+        shown.y = ((float)height - shown.h) * HALF;
+        SDL_RenderTexture(s_Renderer, s_Texture, &shown, NULL);
+    } else {
+        SDL_RenderTexture(s_Renderer, s_Texture, NULL, NULL);
+    }
     SDL_RenderPresent(s_Renderer);
 }
 
