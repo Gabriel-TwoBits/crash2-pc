@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """Rewrites the decompilation's split data (splat's output from the player's executable) for the host's assembler: the
-data, the bss and the read-only data, and the read-only blocks the game's C includes (INCLUDE_RODATA). The output stays
-in the build directory, never in the repository.
+data, the bss and the read-only data, and the read-only blocks the game's C includes (INCLUDE_RODATA). Their numbers
+become zeros, each run of them labelled, and retail_bytes.s lists the runs with their retail addresses: the program
+copies the player's own executable's bytes there at start-up (src/retail_data.c), so it holds none of the game's data.
+The symbols' addresses stay, for the linker. The output stays in the build directory, never in the repository.
 
     python tools/host_data.py DECOMP OUT [--coff]
 
-DECOMP is the decompilation (the submodule), split by its configure.py; OUT receives macro.inc, data.s, and asm/'s
-included blocks at their paths, for the C's `.include` lines to find there. --coff writes them for 32-bit Windows'
-COFF: its C symbols take a leading underscore, and its sections' flags are COFF's.
+DECOMP is the decompilation (the submodule), split by its configure.py; OUT receives macro.inc, data.s, retail_bytes.s,
+and asm/'s included blocks at their paths, for the C's `.include` lines to find there. --coff writes them for 32-bit
+Windows' COFF: its C symbols take a leading underscore, and its sections' flags are COFF's.
 """
 import re
 import sys
@@ -37,6 +39,21 @@ BLOCK_ALIGNMENT = 2
 CODE_LABEL_WORD = re.compile(r"\.long \.L[0-9A-F]+\b")
 # A word holding a symbol's address (not a number, not a jump table's local label)
 SYMBOL_WORD = re.compile(r"(\.long )([A-Za-z_]\w*)\b")
+# A value of the split's data, its retail address in splat's comment: a number (an .asciz's bytes on the next line, its
+# string's up to the first zero), or a symbol's or a jump table label's address, which starts with a letter, _ or .
+DATUM = re.compile(r"^(\s*/\* [0-9A-F]+ ([0-9A-F]{8})(?: [0-9A-F]+)? \*/ )\.(byte|short|long|asciz) (.+)$")
+STRING_BYTES = re.compile(r"^\s*/\* ([0-9A-F]+) \*/$")
+DATUM_BYTES = {"byte": 1, "short": 2, "long": 4}
+SYMBOLIC = re.compile(r"[A-Za-z_.]")
+# A run stops at an alignment, so its words' offsets from its label are the retail ones whatever the padding
+ALIGNMENT_LINE = re.compile(r"^\s*\.p2align\b")
+# The table's sections and its entries: the run's label, its retail address and its bytes
+TABLE_SECTION = ".section .rodata"
+# Its words 4-aligned
+TABLE_ALIGNMENT = 2
+COFF_TABLE_SECTION = '.section .rdata, "dr"'
+TABLES = {"writable": "g_RetailWritable", "read-only": "g_RetailReadOnly"}
+RUN_LABELS = {"writable": "retail_writable_{}", "read-only": "retail_read_only_{}"}
 # The sections' flags: ELF's allocated and writable, or allocated, as COFF's data and read-only data
 COFF_SECTIONS = {'.section .data, "wa"': '.section .data, "dw"', '.section .rodata, "a"': '.section .rodata, "dr"'}
 MACRO_INC = """\
@@ -66,12 +83,105 @@ BSS_SECTION = '.section .bss, "wa"'
 BSS_AS_DATA = '.section .data, "wa"'
 
 
-def host(text, alignment, coff):
+class Runs:
+    """The runs of numbers left out, labelled in the order they're found: (label, retail address, bytes)"""
+
+    def __init__(self, label):
+        self.label = label
+        self.found = []
+        self.open = None
+
+    def add(self, address, size, value_is_zero):
+        """A number's place; the label to put before it when it starts a run, else None. A zero extends a run but
+        starts none: zeros are what the build leaves"""
+        if self.open is not None and self.open[1] + self.open[2] == address:
+            self.open[2] += size
+            return None
+        elif value_is_zero:
+            self.close()
+            return None
+        else:
+            self.close()
+            self.open = [self.label.format(len(self.found)), address, size]
+            self.found.append(self.open)
+            return self.open[0]
+
+    def close(self):
+        self.open = None
+
+
+def string_bytes(line):
+    """An .asciz's bytes from splat's comment after it: its string's, its zero included"""
+    found = STRING_BYTES.match(line or "")
+    if found is None:
+        sys.exit(f"an .asciz without its bytes after it: {line!r}")
+    else:
+        data = bytes.fromhex(found.group(1))
+    if 0 not in data:
+        sys.exit(f"an .asciz's bytes without its zero: {line!r}")
+    else:
+        return data, data.index(0) + 1
+
+
+def blank(text, runs, coff):
+    """The text with its numbers as zeros, each run of them after a global label runs records"""
+    lines = text.split("\n")
+    out = []
+    prefix = "_" if coff else ""
+    for index, line in enumerate(lines):
+        datum = DATUM.match(line)
+        if datum is None:
+            if ALIGNMENT_LINE.match(line):
+                runs.close()
+            else:
+                # A label, a comment or a section: the run goes on
+                pass
+            out.append(line)
+            continue
+        else:
+            comment, address, kind, value = datum.group(1), int(datum.group(2), 16), datum.group(3), datum.group(4)
+        if kind == "asciz":
+            data, size = string_bytes(lines[index + 1] if index + 1 < len(lines) else None)
+            label = runs.add(address, size, not any(data[:size]))
+            blanked = f"{comment}.zero {size}"
+        elif SYMBOLIC.match(value):
+            # An address the linker writes
+            runs.close()
+            out.append(line)
+            continue
+        else:
+            label = runs.add(address, DATUM_BYTES[kind], int(value, 0) == 0)
+            blanked = f"{comment}.{kind} 0"
+        if label is not None:
+            out.append(f".global {prefix}{label}\n{prefix}{label}:")
+        else:
+            # Within a run, or a zero
+            pass
+        out.append(blanked)
+    runs.close()
+    return "\n".join(out)
+
+
+def table(writable, read_only, coff):
+    """retail_bytes.s: each run's label, retail address and bytes, the writable data's and the read-only data's"""
+    prefix = "_" if coff else ""
+    lines = ["/* The game's data the build leaves as zeros: where each run is, its retail address and its bytes, which "
+             "src/retail_data.c copies from the player's executable */",
+             COFF_TABLE_SECTION if coff else TABLE_SECTION, f".p2align {TABLE_ALIGNMENT}"]
+    for name, runs in ((TABLES["writable"], writable), (TABLES["read-only"], read_only)):
+        lines += [f".global {prefix}{name}", f"{prefix}{name}:"]
+        lines += [f"    .long {prefix}{label}, 0x{address:08X}, {size}" for label, address, size in runs.found]
+        lines += [f".global {prefix}{name}Count", f"{prefix}{name}Count:", f"    .long {len(runs.found)}"]
+    return "\n".join(lines) + "\n"
+
+
+def host(text, alignment, coff, runs):
     """splat's data directives as the host's assembler reads them, each section aligned to 1 << alignment, for COFF
-    when coff is set"""
+    when coff is set, their numbers left to runs"""
     text = text.replace(BSS_SECTION, BSS_AS_DATA)
     text = WORD.sub(".long", text)
     text = ALIGN.sub(".p2align", text)
+    text = blank(text, runs, coff)
     # TRADEOFF: the split's jump tables hold 0 in place of their labels; a table the host's C reads would need them
     text = CODE_LABEL_WORD.sub(".long 0", text)
     if coff:
@@ -98,8 +208,10 @@ def main():
         out.mkdir(parents=True, exist_ok=True)
     (out / "macro.inc").write_text(COFF_MACRO_INC if coff else MACRO_INC)
     alignments = COFF_SECTION_ALIGNMENTS if coff else SECTION_ALIGNMENTS
+    writable, read_only = Runs(RUN_LABELS["writable"]), Runs(RUN_LABELS["read-only"])
     for name, path in DATA_FILES.items():
-        (out / name).write_text(host((decomp / path).read_text(), alignments[name], coff))
+        runs = read_only if name == "rodata.s" else writable
+        (out / name).write_text(host((decomp / path).read_text(), alignments[name], coff, runs))
     blocks = 0
     for source in sorted((decomp / "src").rglob("*.c")):
         for folder, symbol in INCLUDE_RODATA.findall(source.read_text()):
@@ -108,9 +220,11 @@ def main():
                 sys.exit(f"{decomp / block} missing: split the decompilation again")
             else:
                 (out / block).parent.mkdir(parents=True, exist_ok=True)
-                (out / block).write_text(host((decomp / block).read_text(), BLOCK_ALIGNMENT, coff))
+                (out / block).write_text(host((decomp / block).read_text(), BLOCK_ALIGNMENT, coff, read_only))
                 blocks += 1
-    print(f"{out}: {len(DATA_FILES)} data files, {blocks} read-only blocks")
+    (out / "retail_bytes.s").write_text(table(writable, read_only, coff))
+    print(f"{out}: {len(DATA_FILES)} data files, {blocks} read-only blocks, "
+          f"{len(writable.found) + len(read_only.found)} runs of the retail executable's bytes left out")
 
 
 if __name__ == "__main__":

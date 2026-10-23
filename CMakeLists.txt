@@ -53,11 +53,11 @@ endif()
 # dependencies don't follow: it runs again on a change to that C
 file(GLOB_RECURSE DECOMP_SOURCES CONFIGURE_DEPENDS ${DECOMP}/src/*.c)
 add_custom_command(
-    OUTPUT ${HOST_DATA} ${HOST_ASM}/macro.inc
+    OUTPUT ${HOST_DATA} ${HOST_ASM}/macro.inc ${HOST_ASM}/retail_bytes.s
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/host_data.py ${DECOMP} ${HOST_ASM} ${HOST_DATA_FORMAT}
     DEPENDS ${CMAKE_SOURCE_DIR}/tools/host_data.py ${SPLIT_DATA} ${DECOMP_SOURCES}
     COMMENT "Rewriting the split's data for the host")
-add_custom_target(host_data DEPENDS ${HOST_DATA} ${HOST_ASM}/macro.inc)
+add_custom_target(host_data DEPENDS ${HOST_DATA} ${HOST_ASM}/macro.inc ${HOST_ASM}/retail_bytes.s)
 
 # The libraries' functions at their retail addresses, for the interpreter to run them from the disc (src/sdk.c)
 file(GLOB_RECURSE SDK_ASM CONFIGURE_DEPENDS ${DECOMP}/asm/sdk/*.s)
@@ -89,6 +89,9 @@ set_source_files_properties(src/render.c PROPERTIES OBJECT_DEPENDS "${SHADER_HEA
 # data, the bss (tools/host_data.py puts it in .data, so the host's own data can't come between)
 file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${DECOMP}/src/game/*.c)
 add_library(game OBJECT ${HOST_ASM}/data.s ${GAME_SOURCES} ${HOST_ASM}/bss.s ${HOST_ASM}/rodata.s)
+# A file's read-only blocks come in through `.include` (INCLUDE_RODATA), which its dependencies don't list: the game's
+# files build again when tools/host_data.py writes them (in under a second)
+set_source_files_properties(${GAME_SOURCES} PROPERTIES OBJECT_DEPENDS ${HOST_ASM}/retail_bytes.s)
 add_dependencies(game host_data)
 # The split's data includes macro.inc: the host's (tools/host_data.py) before the decompilation's, which is MIPS ELF's
 target_include_directories(game BEFORE PRIVATE ${HOST_ASM})
@@ -133,6 +136,8 @@ set(PORT_SOURCES
     src/sampler.c
     src/mips.c
     src/sdk.c
+    src/retail_data.c
+    ${HOST_ASM}/retail_bytes.s
     src/native.c
     src/handwritten.c
     src/video.c

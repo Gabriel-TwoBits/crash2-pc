@@ -5,6 +5,7 @@
 #include "mips.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
+#include "retail_data.h"
 #include "sdk_symbols.h"
 #include "spu_host.h"
 
@@ -318,6 +319,8 @@ void Host_SoundStart(void) {
         text_bytes > bytes - EXE_HEADER_BYTES) {
         Host_Fatal("the disc's %s isn't the retail executable", EXECUTABLE);
     } else {
+        /* The executable gives the game's data as well as the libraries' code */
+        Host_FillRetailData(file + EXE_HEADER_BYTES, text_bytes);
         Mips_SetImage(file + EXE_HEADER_BYTES, text_bytes);
         Mips_SetIo(&s_Io);
     }
