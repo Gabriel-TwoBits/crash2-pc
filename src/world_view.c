@@ -23,7 +23,7 @@
  * game's own sort does. Beside the 4:3 picture the faces turned away are drawn too (the world doesn't mark them, its
  * lists leave them out), behind the faces nearer by depth; a test of each against those drawn would leave them out.
  * A polygon cut at the camera (see the cut) takes a scratchpad slot the zone leaves free for each world cut from: in a
- * zone of 8 worlds, or past CUT_SLOTS of them, the rest are drawn as the game would */
+ * zone of 8 worlds, or past CUT_SLOTS of them, the rest are left out */
 
 /* The sort lists: a count, a word unused, then the entries (decomp's 80039D2C.c, SORT_LIST_ENTRIES) */
 #define SORT_LIST_ENTRIES 0x5F0
@@ -183,10 +183,8 @@ static uint16_t s_AddedAfter[WIDE_LIST_ENTRIES];
 static int32_t s_AddedDepth[WIDE_LIST_ENTRIES];
 static int s_AddedCount;
 static int s_Order[WIDE_LIST_ENTRIES];
-/* The camera's entries' depths, and the most of each from it to the list's end; whether each is cut, its pieces
- * drawn in its place */
+/* The camera's entries' depths, and the most of each from it to the list's end */
 static int32_t s_CameraDepth[SORT_LIST_ENTRIES];
-static int s_Replaced[SORT_LIST_ENTRIES];
 static int32_t s_DepthOnward[SORT_LIST_ENTRIES];
 /* The zone's worlds, as the GTE turns them this frame */
 static const int32_t *s_Zone;
@@ -296,10 +294,10 @@ static void write_wide(const uint16_t *camera, int count) {
     }
     qsort(s_Order, (size_t)s_AddedCount, sizeof(s_Order[0]), added_order);
     for (index = 0; index <= count; index++) {
-        if (index > 0 && !s_Replaced[index - 1]) {
+        if (index > 0) {
             s_Wide[SORT_LIST_FIRST + written++] = camera[SORT_LIST_FIRST + index - 1];
         } else {
-            /* The slot before the camera's entries, or one cut */
+            /* The slot before the camera's entries */
         }
         while (next < s_AddedCount && slot_after(s_AddedAfter[s_Order[next]]) == index) {
             s_Wide[SORT_LIST_FIRST + written++] = s_Added[s_Order[next++]];
@@ -519,18 +517,20 @@ static int bounds_beside(int64_t low_x, int64_t high_x, int64_t low_y, int64_t h
            (high_x > band - BESIDE_MARGIN || low_x < BESIDE_MARGIN - band);
 }
 
-/* The cut: a polygon reaching nearer than the GTE's division's limit, behind the camera or across more than the GPU
- * draws is cut at a plane before the camera (CUT_NEAR_MARGIN past that limit, H / 2, more than a new corner's rounding
- * moves it) and at four planes beyond the screen's edges
- * (CUT_GUARD pixels out, which keep a piece within what the GPU draws), and its piece drawn as triangles of a world
- * the host makes: the GTE then projects each corner right. A host world is one of the scratchpad's slots the zone
- * leaves free, one for each world cut from, its position from the camera that world's (so a corner kept keeps its
- * exact position, a new one rounded to the 16 units of a vertex's), its own vertices, triangles, colours (a new
- * corner's between its edge's two) and textures (a new corner's u and v between its edge's two). An animated texture
- * is taken at the clock's frame, a depth level's at the polygon's depth */
+/* The cut: a polygon beside reaching nearer than the GTE's division's limit, behind the camera or across more than
+ * the GPU draws is cut at a plane before the camera (CUT_NEAR_MARGIN past that limit, H / 2, more than a new corner's
+ * rounding moves it), at four planes beyond the screen's edges (CUT_GUARD pixels out, which keep a piece within what
+ * the GPU draws) and at the 4:3 picture's edge, a piece on each side, and its pieces drawn as triangles of a world the
+ * host makes: the GTE then projects each corner right. The 4:3 picture stays as the game draws it: the camera's own
+ * polygons are left as they are (cut and drawn whole, the trees and walls against the camera that the game's lists
+ * keep but the PlayStation never drew showed, their textures stretched across the screen: tried). A host world is
+ * one of the scratchpad's slots the zone leaves free, one for each world cut from, its position from the camera that
+ * world's (so a corner kept keeps its exact position, a new one rounded to the 16 units of a vertex's), its own
+ * vertices, triangles, colours (a new corner's between its edge's two) and textures (a new corner's u and v between
+ * its edge's two). An animated texture is taken at the clock's frame, a depth level's at the polygon's depth */
 #define CUT_NEAR_MARGIN 32
 #define CUT_GUARD 128
-#define CUT_PLANES 5
+#define CUT_PLANES 6
 #define CUT_CORNERS_MOST (QUAD_CORNERS + CUT_PLANES)
 #define CUT_SLOTS 4
 #define CUT_VERTICES 1024
@@ -541,7 +541,7 @@ static int bounds_beside(int64_t low_x, int64_t high_x, int64_t low_y, int64_t h
 #define RECORD_BYTES (WORD_BYTES + sizeof(uint16_t))
 #define NO_SLOT (-1)
 
-enum { PLANE_NEAR, PLANE_LEFT, PLANE_RIGHT, PLANE_TOP, PLANE_BOTTOM };
+enum { PLANE_NEAR, PLANE_LEFT, PLANE_RIGHT, PLANE_TOP, PLANE_BOTTOM, PLANE_BESIDE_LEFT, PLANE_BESIDE_RIGHT };
 
 typedef struct {
     double model[AXES];
@@ -712,6 +712,7 @@ static double plane_distance(const CutCorner *corner, int plane) {
     double guard_x = (double)((g_HostGte[GTE_CONTROL + GTE_OFX] >> HALF_SHIFT) + CUT_GUARD);
     double guard_y = (double)((g_HostGte[GTE_CONTROL + GTE_OFY] >> HALF_SHIFT) + CUT_GUARD);
     double across = h * WIDE_NUMERATOR / WIDE_DENOMINATOR;
+    double band = (double)((g_HostGte[GTE_CONTROL + GTE_OFX] >> HALF_SHIFT) * WIDE_NUMERATOR / WIDE_DENOMINATOR);
 
     switch (plane) {
     case PLANE_NEAR:
@@ -724,6 +725,10 @@ static double plane_distance(const CutCorner *corner, int plane) {
         return guard_y * corner->view[2] + h * corner->view[1];
     case PLANE_BOTTOM:
         return guard_y * corner->view[2] - h * corner->view[1];
+    case PLANE_BESIDE_LEFT:
+        return -(band * corner->view[2] + across * corner->view[0]);
+    case PLANE_BESIDE_RIGHT:
+        return across * corner->view[0] - band * corner->view[2];
     default:
         Host_Fatal("the wide view: plane %d", plane);
         return 0;
@@ -854,8 +859,9 @@ static uint16_t cut_triangle(int slot, const CutCorner *a, const CutCorner *b, c
     return (uint16_t)(((uint32_t)cut_slot(slot) << ENTRY_WORLD_SHIFT) | KIND_TRIANGLE | (uint32_t)cut->triangles++);
 }
 
-/* A seen polygon cut: its piece's corners and their count (0 if none is left), and the piece's bounds on the screen */
-static int cut_polygon(const Seen *seen, uint16_t entry, CutCorner *piece, int64_t *bounds) {
+/* A seen polygon cut, beside the 4:3 picture on one side (PLANE_BESIDE_LEFT or PLANE_BESIDE_RIGHT): its piece's
+ * corners and their count (0 if none is left), and the piece's bounds on the screen */
+static int cut_polygon(const Seen *seen, uint16_t entry, int side, CutCorner *piece, int64_t *bounds) {
     CutCorner other[CUT_CORNERS_MOST * 2];
     int count = cut_corners(seen, entry, piece);
     int plane, corner;
@@ -863,6 +869,12 @@ static int cut_polygon(const Seen *seen, uint16_t entry, CutCorner *piece, int64
     for (plane = PLANE_NEAR; plane <= PLANE_BOTTOM && count > 0; plane++) {
         count = cut_at(piece, count, plane, other);
         memcpy(piece, other, sizeof(other[0]) * (size_t)count);
+    }
+    if (count > 0) {
+        count = cut_at(piece, count, side, other);
+        memcpy(piece, other, sizeof(other[0]) * (size_t)count);
+    } else {
+        /* Nothing left */
     }
     bounds[0] = INT64_MAX;
     bounds[1] = INT64_MIN;
@@ -915,26 +927,17 @@ static int add_piece(const Seen *seen, const CutCorner *piece, int count, uint16
     return added;
 }
 
-/* The camera's entries' depths, and the deepest of each from it on; those the GTE or the GPU would draw wrong, cut,
- * their pieces in their places */
-static void camera_entries(const uint16_t *camera, int count) {
+/* The camera's entries' depths, and the deepest of each from it on */
+static void camera_depths(const uint16_t *camera, int count) {
     int index;
 
     for (index = 0; index < count; index++) {
         Seen seen;
 
-        s_Replaced[index] = 0;
-        if (!see(camera[SORT_LIST_FIRST + index], &seen)) {
-            s_CameraDepth[index] = 0;
-        } else if (seen.cut) {
-            CutCorner piece[CUT_CORNERS_MOST * 2];
-            int64_t bounds[4];
-            int corners = cut_polygon(&seen, camera[SORT_LIST_FIRST + index], piece, bounds);
-
+        if (see(camera[SORT_LIST_FIRST + index], &seen)) {
             s_CameraDepth[index] = seen.depth;
-            s_Replaced[index] = corners == 0 || add_piece(&seen, piece, corners, (uint16_t)index) > 0;
         } else {
-            s_CameraDepth[index] = seen.depth;
+            s_CameraDepth[index] = 0;
         }
     }
     for (index = count - 1; index >= 0; index--) {
@@ -993,16 +996,20 @@ static void add_beside(uint16_t entry, int count) {
             /* Not beside */
         }
     } else {
-        CutCorner piece[CUT_CORNERS_MOST * 2];
-        int64_t bounds[4];
-        int corners = cut_polygon(&seen, entry, piece, bounds);
+        int side;
 
-        if (corners > 0 && bounds_beside(bounds[0], bounds[1], bounds[2], bounds[3], &outside)) {
-            add_piece(&seen, piece, corners, outside ? after_by_depth(seen.depth, count) : NOWHERE);
-            s_Place[entry] = ADDED;
-        } else {
-            /* Nothing left of it beside */
+        for (side = PLANE_BESIDE_LEFT; side <= PLANE_BESIDE_RIGHT; side++) {
+            CutCorner piece[CUT_CORNERS_MOST * 2];
+            int64_t bounds[4];
+            int corners = cut_polygon(&seen, entry, side, piece, bounds);
+
+            if (corners > 0 && bounds_beside(bounds[0], bounds[1], bounds[2], bounds[3], &outside)) {
+                add_piece(&seen, piece, corners, after_by_depth(seen.depth, count));
+            } else {
+                /* Nothing left of it on this side */
+            }
         }
+        s_Place[entry] = ADDED;
     }
 }
 
@@ -1056,7 +1063,7 @@ uint16_t *Host_WorldSortList(uint16_t *camera) {
     s_AddedCount = 0;
     take_scene();
     cut_begin();
-    camera_entries(camera, count);
+    camera_depths(camera, count);
     add_worlds_beside(count);
     cut_end();
     write_wide(camera, count);

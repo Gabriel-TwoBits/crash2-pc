@@ -315,19 +315,19 @@ matching"):
       tables' sizes; a world not loaded has none. The warp room's right edge
       and Turtle Woods' corners now drawn; at most 897 polygons added and 102 KB of primitives a frame on Turtle
       Woods; the game's objects at 16:9 the same as before at 6 game frames.
-    - **Cut at the camera:** a polygon reaching nearer than the GTE's division's limit (H / 2) or behind the camera,
-      or wider or higher than the GPU draws, the GTE and the GPU draw wrong or not at all: left out, it was a hole
-      where it would show (in Snow Go's bonus' narrow shaft, black wedges at the edges); projected outward as the GTE
-      does, it stretched over what lay beside (tried, black triangles and smears at Turtle Woods' edges). Such a
-      polygon, the camera's own or beside, is cut at a plane 32 units past that limit and at four planes 128 pixels
-      beyond the screen's edges, and its piece drawn as triangles of a world the host makes in a scratchpad slot the
-      zone leaves free (one for each world cut from, at its position from the camera, so the corners kept keep their
-      exact positions; a new corner rounded to a vertex's 16 units), with its own vertices, colours and textures (a
-      new corner's colour, u and v between its edge's two, an animated texture taken at the clock's frame). A camera's
-      polygon cut is drawn in its place, its pieces there. With the plane at H first, the warp room's entry into
-      Turtle Woods' portal cut 63 of the camera's polygons to nothing (behind it, the picture the same) and Turtle
-      Woods up to 156 triangles a frame; the plane at the limit keeps what lies between. The program's data end at
-      0x807ED000 with the 4 host worlds' tables, 78 KB.
+    - **Cut at the camera:** a polygon beside reaching nearer than the GTE's division's limit (H / 2) or behind the
+      camera, or wider or higher than the GPU draws, the GTE and the GPU draw wrong or not at all: left out, it was a
+      hole where it would show (in Snow Go's bonus' narrow shaft, black wedges at the edges); projected outward as the
+      GTE does, it stretched over what lay beside (tried, black triangles and smears at Turtle Woods' edges). Such a
+      polygon is cut at a plane 32 units past that limit, at four planes 128 pixels beyond the screen's edges and at
+      the 4:3 picture's edge (a piece each side), and its pieces drawn as triangles of a world the host makes in a
+      scratchpad slot the zone leaves free (one for each world cut from, at its position from the camera, so the
+      corners kept keep their exact positions; a new corner rounded to a vertex's 16 units), with its own vertices,
+      colours and textures (a new corner's colour, u and v between its edge's two, an animated texture taken at the
+      clock's frame). The 4:3 picture stays the game's: cutting the camera's own polygons too drew the trees and walls
+      against the camera that its lists keep but the PlayStation never drew, their textures stretched across the
+      screen, worse on the paths into the view. The program's data end at 0x807ED000 with the 4 host worlds' tables,
+      78 KB (the heap's base 64 KB further, the game the same).
     - **Where the polygons beside go:** a list goes from the farthest polygon to the nearest, and `Gfx_DrawWorlds`
       draws it from its end, linking each polygon no nearer than those before it (`link_primitive`): placed first in
       the list, the polygons beside were drawn behind all the camera's and in no order among themselves (the warp
