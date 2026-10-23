@@ -2,6 +2,7 @@ build/
 build-linux/
 build-linux64/
 build-windows/
+build-windows64/
 .venv/
 __pycache__/
 /wbuild/

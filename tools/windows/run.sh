@@ -1,12 +1,19 @@
 #!/bin/sh
 # Runs build-windows/crash2.exe under Wine in the Windows build's container, for the same checks as the Linux build's
 # runs (CLAUDE.md, "Running and testing"):
-#   tools/windows/run.sh [--window] DISC.cue OUT [NAME=VALUE ...]
-# Headless, or with --window in a window on Xvfb's virtual display. The disc's folder is mounted read-only at Z:/disc,
-# OUT at Z:/out; each NAME=VALUE goes to the program's environment, so a value naming a file takes its Z:/out path
-# (CRASH2_GAME_CLOCK=Z:/out).
+#   tools/windows/run.sh [--64] [--window] DISC.cue OUT [NAME=VALUE ...]
+# --64 runs the 64-bit build's, build-windows64/crash2.exe. Headless, or with --window in a window on Xvfb's virtual
+# display. The disc's folder is mounted read-only at Z:/disc, OUT at Z:/out; each NAME=VALUE goes to the program's
+# environment, so a value naming a file takes its Z:/out path (CRASH2_GAME_CLOCK=Z:/out).
 set -eu
 
+BUILD=build-windows
+if [ "${1:-}" = "--64" ]; then
+    BUILD=build-windows64
+    shift
+else
+    : # The 32-bit build's
+fi
 if [ "${1:-}" = "--window" ]; then
     LAUNCH="xvfb-run -a wine"
     HEADLESS=""
@@ -16,7 +23,7 @@ else
     HEADLESS="--env CRASH2_HEADLESS=1"
 fi
 if [ $# -lt 2 ]; then
-    sed -n '2,8p' "$0"
+    sed -n '2,9p' "$0"
     exit 2
 else
     DISC=$(cd "$(dirname "$1")" && pwd)
@@ -35,4 +42,4 @@ done
 # shellcheck disable=SC2086 # each --env and the launch's words apart
 "$ENGINE" run --rm --init -v "$PWD":/project:ro -v "$DISC":/disc:ro -v "$OUT":/out -w /out \
     --env WINEDEBUG=-all --env "WINEDLLOVERRIDES=mscoree,mshtml=" $HEADLESS $ENVIRONMENT "$IMAGE" \
-    $LAUNCH /project/build-windows/crash2.exe "Z:/disc/$CUE"
+    $LAUNCH "/project/$BUILD/crash2.exe" "Z:/disc/$CUE"
