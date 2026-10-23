@@ -63,8 +63,14 @@ add_custom_command(
     COMMENT "Listing the libraries' retail addresses")
 set_source_files_properties(src/sdk.c PROPERTIES OBJECT_DEPENDS ${SDK_SYMBOLS})
 
-# The GPU renderer's shaders (shaders/), GLSL compiled to SPIR-V for SDL_GPU's Vulkan, each a C array in a header
+# The GPU renderer's shaders (shaders/), GLSL compiled to SPIR-V for SDL_GPU's Vulkan, each a C array in a header; on
+# macOS, whose SDL_GPU is Metal's, each also as MSL (tools/msl_shader.py)
 find_program(GLSLANG glslangValidator REQUIRED)
+if(APPLE)
+    find_program(SPIRV_CROSS spirv-cross REQUIRED)
+else()
+    set(SPIRV_CROSS)
+endif()
 set(SHADER_HEADERS)
 foreach(shader draw.vert draw.frag present.vert present.frag)
     string(REPLACE "." "_" shader_name ${shader})
@@ -75,6 +81,18 @@ foreach(shader draw.vert draw.frag present.vert present.frag)
         DEPENDS ${CMAKE_SOURCE_DIR}/shaders/${shader}
         COMMENT "Compiling the shader ${shader}")
     list(APPEND SHADER_HEADERS ${header})
+    if(APPLE)
+        set(msl_header ${CMAKE_BINARY_DIR}/shaders/${shader_name}_msl.h)
+        add_custom_command(
+            OUTPUT ${msl_header}
+            COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/msl_shader.py ${GLSLANG} ${SPIRV_CROSS}
+                ${CMAKE_SOURCE_DIR}/shaders/${shader} ${shader_name} ${msl_header}
+            DEPENDS ${CMAKE_SOURCE_DIR}/tools/msl_shader.py ${CMAKE_SOURCE_DIR}/shaders/${shader}
+            COMMENT "Translating the shader ${shader} to MSL")
+        list(APPEND SHADER_HEADERS ${msl_header})
+    else()
+        # SPIR-V only
+    endif()
 endforeach()
 set_source_files_properties(src/render.c PROPERTIES OBJECT_DEPENDS "${SHADER_HEADERS}")
 

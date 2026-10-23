@@ -15,6 +15,20 @@
 #include "draw_frag.h"
 #include "present_vert.h"
 #include "present_frag.h"
+#ifdef __APPLE__
+/* macOS's SDL_GPU is Metal's, which takes MSL: the shaders translated (tools/msl_shader.py) */
+#include "draw_vert_msl.h"
+#include "draw_frag_msl.h"
+#include "present_vert_msl.h"
+#include "present_frag_msl.h"
+#define SHADER_FORMATS (SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL)
+#define MSL(name) name##_msl
+#else
+#define SHADER_FORMATS SDL_GPU_SHADERFORMAT_SPIRV
+#define MSL(name) NULL
+#endif
+/* SPIRV-Cross renames a shader's main, a name MSL reserves */
+#define MSL_ENTRY_POINT "main0"
 
 /* The GPU renderer. Each primitive gpu.c hands the software rasterizer is recorded again here: its vertices in VRAM's
  * pixels, its texture page, CLUT, window and the limits of its texture coordinates, its blending. At a vertical blank
@@ -157,15 +171,23 @@ static int s_Mapped;
 static SDL_GPUFence *s_Fences[FRAMES_IN_FLIGHT];
 static int s_Frame;
 
-static SDL_GPUShader *shader(const uint32_t *code, size_t bytes, SDL_GPUShaderStage stage, Uint32 samplers,
-                             Uint32 uniforms) {
+/* A shader as SPIR-V, or as MSL (NULL where there is none) for a device that takes it */
+static SDL_GPUShader *shader(const uint32_t *spirv, size_t spirv_bytes, const char *msl, SDL_GPUShaderStage stage,
+                             Uint32 samplers, Uint32 uniforms) {
     SDL_GPUShaderCreateInfo info;
 
     SDL_zero(info);
-    info.code = (const Uint8 *)code;
-    info.code_size = bytes;
-    info.entrypoint = "main";
-    info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    if (msl != NULL && (SDL_GetGPUShaderFormats(s_Device) & SDL_GPU_SHADERFORMAT_MSL) != 0) {
+        info.code = (const Uint8 *)msl;
+        info.code_size = strlen(msl);
+        info.entrypoint = MSL_ENTRY_POINT;
+        info.format = SDL_GPU_SHADERFORMAT_MSL;
+    } else {
+        info.code = (const Uint8 *)spirv;
+        info.code_size = spirv_bytes;
+        info.entrypoint = "main";
+        info.format = SDL_GPU_SHADERFORMAT_SPIRV;
+    }
     info.stage = stage;
     info.num_samplers = samplers;
     info.num_uniform_buffers = uniforms;
@@ -203,8 +225,9 @@ static int create_draw_pipelines(void) {
     SDL_GPUVertexBufferDescription buffer;
     SDL_GPUColorTargetDescription target;
     SDL_GPUGraphicsPipelineCreateInfo info;
-    SDL_GPUShader *vertex = shader(draw_vert, sizeof(draw_vert), SDL_GPU_SHADERSTAGE_VERTEX, 0, 1);
-    SDL_GPUShader *fragment = shader(draw_frag, sizeof(draw_frag), SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
+    SDL_GPUShader *vertex = shader(draw_vert, sizeof(draw_vert), MSL(draw_vert), SDL_GPU_SHADERSTAGE_VERTEX, 0, 1);
+    SDL_GPUShader *fragment =
+        shader(draw_frag, sizeof(draw_frag), MSL(draw_frag), SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
     int pipeline;
     int created = vertex != NULL && fragment != NULL;
 
@@ -247,8 +270,10 @@ static int create_draw_pipelines(void) {
 static int create_present_pipeline(void) {
     SDL_GPUColorTargetDescription target;
     SDL_GPUGraphicsPipelineCreateInfo info;
-    SDL_GPUShader *vertex = shader(present_vert, sizeof(present_vert), SDL_GPU_SHADERSTAGE_VERTEX, 0, 1);
-    SDL_GPUShader *fragment = shader(present_frag, sizeof(present_frag), SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
+    SDL_GPUShader *vertex =
+        shader(present_vert, sizeof(present_vert), MSL(present_vert), SDL_GPU_SHADERSTAGE_VERTEX, 0, 1);
+    SDL_GPUShader *fragment =
+        shader(present_frag, sizeof(present_frag), MSL(present_frag), SDL_GPU_SHADERSTAGE_FRAGMENT, 1, 0);
 
     if (vertex != NULL && fragment != NULL) {
         SDL_zero(target);
@@ -335,7 +360,7 @@ static int create_resources(void) {
 }
 
 int Render_Start(SDL_Window *window) {
-    s_Device = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_SPIRV, false, NULL);
+    s_Device = SDL_CreateGPUDevice(SHADER_FORMATS, false, NULL);
     if (s_Device == NULL) {
         Host_Log("no GPU renderer (%s): the picture at the PlayStation's resolution", SDL_GetError());
         return 0;
