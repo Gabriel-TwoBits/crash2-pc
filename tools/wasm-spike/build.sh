@@ -56,7 +56,7 @@ echo "game: IR, adjusted for wasm, then objects"
 "$SPIKE/prepare-game.sh"
 rm -f wbuild/obj/*
 for source in wbuild/game-src/*.c; do
-    "$CLANG" "${TARGET[@]}" "${GAME_FLAGS[@]}" -include "$SPIKE/prototypes.h" -S -emit-llvm "$source" \
+    "$CLANG" "${TARGET[@]}" "${GAME_FLAGS[@]}" -S -emit-llvm "$source" \
         -o "wbuild/obj/$(basename "${source%.c}").ll"
 done
 python3 -I "$SPIKE/align4.py" wbuild/obj/*.ll
