@@ -359,3 +359,37 @@ matching"):
     flickered, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off: polygons
     falling back from the steady ones as their vertices crossed the 1.5 pixels' tolerance (milestone 11, "Kept within
     the GTE's limits"); whether that was all of it is for the player's eye.
+16. **64-bit through wasm (a spike, branch `wasm-spike`).** The game's C needs 32-bit pointers (decision 1), which macOS
+    and a 64-bit system's libraries no longer give; wasm32 keeps them, and wasm2c turns a module into C any 64-bit
+    system compiles. `tools/wasm-spike/build.sh` builds the headless program that way: the game's C and the host's,
+    the software picture, the SPU and the interpreter, compiled by wasi-sdk 34's clang for wasm32, linked by wasm-ld,
+    turned into C by WABT 1.0.42's wasm2c and compiled by GCC with a runner holding the part of WASI the program
+    uses. On the demo's 6,000 game frames, the card's run and the Snow Go run, `wbuild/crash2-native` (x86-64) writes
+    the same `game_frames.txt`, SPU log and card as the 32-bit build, and some 10% sooner (9.4 s for the demo, 10.7 s).
+    - **The data's layout:** wasm-ld has no linker script. The split's data and bss are one IR global each
+      (`wasm_data.py`), every value at its retail offset and every label an alias into it, the numbers zeros that
+      `src/retail_data.c` fills from the disc; between them the game's files' variables, each in a data section of its
+      own and 4-aligned in the IR (`align4.py`), tentative definitions left to the split's bss (`uncommon.py`, wasm
+      has no common symbols). All 60 variables the C defines sit at their retail addresses plus one offset. The game's
+      memory starts at 0x80070000: above 0x80000000 for its pointers' sign, above the retail data's addresses, which
+      `mips.c` maps to the port's copy.
+    - **Calls:** a wasm call of another signature than its callee's traps. The game's C has 133 direct calls whose
+      declaration differs from the definition (K&R declarations, `void` defined, `int` read, an argument too many,
+      `RotTrans`'s fourth) and 41 indirect ones through pointers to functions of other signatures (`D_8005B1E0`'s
+      handlers, called as `void (*)(void)`). `fixcalls.py` gives each direct call its callee's signature, converting
+      its arguments and result as a prototype would, and routes each indirect one through a dispatcher of its
+      signature, which calls the 192 functions whose address is taken directly when the pointer is theirs.
+    - **The C as clang takes it** (`prepare-game.sh`, on copies in `wbuild/`): 17 functions called before their
+      declaration, declared first; `func_80051328`, declared `void` where its value is read, `int`; `func_80023D7C`,
+      whose retail code returns `Ent_GetPropertyValue`'s value that its callers read through a cast, returning it (on
+      x86 the leftover `eax` held it: in wasm the projection's distance was 0 and nothing was drawn). Functions the C
+      declares as data for their addresses (`extern u8 func_8003DD0C[]`) are declared as functions in the IR. These
+      belong in the decompilation: its prototypes (its ROADMAP's shared header) and the equivalent C of
+      `func_80023D7C`.
+    - **The host:** a module's function pointer is its table index, so `host_text.h`'s test of a word holding one of
+      the port's functions (`mips.c`'s `retail_word`) takes a small number; no page protections (`main.c`,
+      `retail_data.c`); no low RAM handler (a module's address 0 is memory); SDL, the GPU renderer and the sampler
+      stubbed (`stubs.c`).
+    - **Left for a 64-bit build:** the window, sound and pad on SDL in the native program around the module, the GPU
+      renderer reading the module's memory, the build in CMake, macOS (Metal for SDL_GPU's shaders) and Windows, and
+      the decompilation's fixes above.
