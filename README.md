@@ -6,8 +6,8 @@ the PC; this repository holds what the PlayStation did around it: the window, th
 sound, the CD, the memory card and the pad.
 
 > [!IMPORTANT]
-> **No game data is included.** You need your own copy of the game: the build reads the executable from your disc image,
-> and the game reads its levels from it. Crash Bandicoot is a trademark of Activision; PlayStation of Sony Interactive
+> **No game data is included.** You need your own copy of the game: the build reads the executable's layout from your
+> disc image, and the program reads the executable's data and the game's levels from it when it starts. Crash Bandicoot is a trademark of Activision; PlayStation of Sony Interactive
 > Entertainment. This is a fan project, not affiliated with or endorsed by either.
 
 ## Status

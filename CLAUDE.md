@@ -11,7 +11,9 @@ A session takes the first milestone not done and updates docs/ROADMAP.md with wh
   both of its builds green), pushed there, then the submodule moves to that commit here. The port redefines the
   decompilation's macros; it doesn't patch its files.
 - **Never commit game data.** Not the executable, not the disc's files, not anything generated from them (the split's
-  data, extracted textures or sounds). The build generates them from the player's own disc image into `build/`.
+  data, extracted textures or sounds). The build generates them from the player's own disc image into `build/`. Nor
+  does the program carry any: the executable's data is zeros in it, copied from the player's disc at start-up
+  (`src/retail_data.c`, docs/ROADMAP.md decision 4), so its releases hold none.
 - **Never commit a path of this machine** (an absolute path, a home folder): not in code, docs or build files. Run
   `git grep -nF "$PWD"` from the root before every push.
 - **Don't copy code from projects without a compatible licence.** The PsyQ libraries are Sony's: the port writes the

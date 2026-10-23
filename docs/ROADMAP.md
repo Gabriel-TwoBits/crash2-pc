@@ -25,6 +25,15 @@ matching"):
    rasterizer into a 1024×512 VRAM, the PlayStation's own model, before any GPU backend. The SPU in software, under
    the retail executable's own libsnd and libspu, run from the player's disc on the interpreter (2026-10-22, in place
    of a sequencer written for the host, which didn't reach the PS1's music: milestone 7).
+4. **None of the game's data in the program (2026-10-23).** The split's data, read-only data and the C's read-only
+   blocks went into the program as splat wrote them, so a release carried the executable's tables and strings (the
+   0.1.0 one's library held 83 of its 84 strings of 12 characters or more). `tools/host_data.py` now writes their
+   numbers as zeros, each run of them at a label, and lists the runs with their retail addresses (`retail_bytes.s`, 127
+   runs); `src/retail_data.c` copies them from the player's executable at start-up, before the game's first
+   instruction, the read-only ones' pages made writable for it. The symbols' addresses stay the linker's. The program
+   then shares one string of the executable's, the window's title; what else it holds of it is the decompilation's own
+   C (its variables defined with their values). The demo's, the card's and a player's run's frames, sound and card,
+   and the GPU renderer's pictures, are the same to the byte, on Linux and under Wine.
 
 ## Milestones
 
