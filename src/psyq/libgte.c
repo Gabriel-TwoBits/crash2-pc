@@ -1,7 +1,7 @@
 /* libgte on the host's GTE registers (src/host.h), the GTE's computations by decomp's model (include/gte.h), the one
  * the game's C runs on: the matrices and vectors from libgte's structures, the registers from psx-spx's "GTE
- * Registers", InitGeom's defaults those the retail executable writes (decomp's split of libgte). Compiled as the game's
- * C is, for gte.h */
+ * Registers", InitGeom's defaults those the retail executable writes (decomp's split of libgte). Compiled with the
+ * game's C's semantics (CMakeLists.txt), for gte.h */
 #define GTE_MVMVA
 #include <math.h>
 

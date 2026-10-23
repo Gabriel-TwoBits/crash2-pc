@@ -95,8 +95,9 @@ target_compile_definitions(game PRIVATE NON_MATCHING GTE_MODEL main=Game_Main)
 # warnings are its own (-w). Each file's data stays in .data in its order, as the retail image's small data
 # (tools/check_layout.py). Unoptimized whatever the build's type: at -O2 the game's C plays otherwise (the demo's run
 # parts from the debug build's and stops on a polyline of over 256 vertices)
+set(GAME_SEMANTICS -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks)
 target_compile_options(game PRIVATE
-    -O0 -std=gnu89 -w -fno-pie -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
+    -O0 -std=gnu89 -w -fno-pie ${GAME_SEMANTICS}
     -fno-zero-initialized-in-bss -fno-toplevel-reorder -fdata-sections
     -include ${CMAKE_SOURCE_DIR}/src/host.h "-Wa,-I${HOST_ASM}")
 
@@ -168,10 +169,10 @@ target_include_directories(${PORT} PRIVATE src ${CMAKE_BINARY_DIR}/sdk ${CMAKE_B
 target_include_directories(${PORT} PRIVATE src/spu_shim third_party/swanstation third_party/swanstation/core)
 target_compile_options(${PORT} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++17 ${HOST_PIC}>)
 target_link_libraries(${PORT} PRIVATE SDL3::SDL3-shared m)
-# libgte's functions run decomp's GTE model (include/gte.h): compiled as the game's C is
+# libgte's functions run decomp's GTE model (include/gte.h): compiled with the game's C's semantics, optimized
 set_source_files_properties(src/psyq/libgte.c PROPERTIES
     INCLUDE_DIRECTORIES "${HOST_ASM};${DECOMP}/include"
-    COMPILE_OPTIONS "-std=gnu89;-w;-DGTE_MODEL;-include;${CMAKE_SOURCE_DIR}/src/host.h")
+    COMPILE_OPTIONS "-std=gnu89;-w;${GAME_SEMANTICS};-DGTE_MODEL;-include;${CMAKE_SOURCE_DIR}/src/host.h")
 set_target_properties(${PORT} PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
 # At the PlayStation's RAM, 0x80000000 (src/host.h), and not position-independent: the game's data holds absolute
 # addresses. The BIOS's file calls go to src/psyq/card.c. On Windows the library is based there without ASLR, the
