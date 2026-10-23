@@ -10,6 +10,10 @@
 
 uint16_t g_Vram[VRAM_HEIGHT][VRAM_WIDTH];
 
+const uint16_t *Host_Vram(void) {
+    return &g_Vram[0][0];
+}
+
 #define VRAM_X_MASK (VRAM_WIDTH - 1)
 #define VRAM_Y_MASK (VRAM_HEIGHT - 1)
 #define COMMAND_SHIFT 24

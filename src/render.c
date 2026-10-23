@@ -567,7 +567,7 @@ static void take_snapshot(void) {
     } else {
         make_room(0, 1, 1);
     }
-    memcpy(s_Snapshots + s_SnapshotCount * VRAM_BYTES, g_Vram, VRAM_BYTES);
+    memcpy(s_Snapshots + s_SnapshotCount * VRAM_BYTES, Host_Vram(), VRAM_BYTES);
     step = add_step(STEP_UPLOAD);
     step->snapshot = s_SnapshotCount++;
     s_VramChanged = 0;
@@ -740,8 +740,8 @@ static float depth_apart(float a, float b) {
 static void projections(const RasterVertex *vertices, int count, float *dx, float *dy, float *depth) {
     Projection found[QUAD_CORNERS][CANDIDATES];
     int counts[QUAD_CORNERS];
-    int steady = g_Settings[SETTING_STEADY].value;
-    int unwarped = g_Settings[SETTING_PERSPECTIVE].value;
+    int steady = Host_Setting(SETTING_STEADY);
+    int unwarped = Host_Setting(SETTING_PERSPECTIVE);
     float reference = 0.0f;
     int alone = 0;
     int index;
@@ -1072,13 +1072,13 @@ static void upload_picture(SDL_GPUCommandBuffer *command, int width, int height,
  * it stretched */
 static SDL_GPUViewport viewport(Uint32 width, Uint32 height) {
     SDL_GPUViewport result;
-    int wide = g_Settings[SETTING_SHAPE].value == SHAPE_WIDE || g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED;
+    int wide = Host_Setting(SETTING_SHAPE) == SHAPE_WIDE || Host_Setting(SETTING_SHAPE) == SHAPE_ZOOMED;
     Uint32 aspect_width = wide ? WIDE_ASPECT_WIDTH : ASPECT_WIDTH;
     Uint32 aspect_height = wide ? WIDE_ASPECT_HEIGHT : ASPECT_HEIGHT;
 
     SDL_zero(result);
     result.max_depth = 1.0f;
-    if (g_Settings[SETTING_SHAPE].value == SHAPE_STRETCHED) {
+    if (Host_Setting(SETTING_SHAPE) == SHAPE_STRETCHED) {
         result.w = (float)width;
         result.h = (float)height;
     } else if (width * aspect_height > height * aspect_width) {
@@ -1131,7 +1131,7 @@ void Render_Present(int x, int y, int width, int height, int enabled, const uint
         rectangle[2] = (float)width / PICTURE_WIDTH;
         rectangle[3] = (float)height / PICTURE_HEIGHT;
     }
-    if (g_Settings[SETTING_SHAPE].value == SHAPE_ZOOMED) {
+    if (Host_Setting(SETTING_SHAPE) == SHAPE_ZOOMED) {
         /* The middle of the picture's height */
         float shown = rectangle[3] * ZOOM_SHOWN_NUMERATOR / ZOOM_SHOWN_DENOMINATOR;
 
@@ -1140,7 +1140,7 @@ void Render_Present(int x, int y, int width, int height, int enabled, const uint
     } else {
         /* All of it */
     }
-    source.sampler = g_Settings[SETTING_SMOOTH].value ? s_Linear : s_Nearest;
+    source.sampler = Host_Setting(SETTING_SMOOTH) ? s_Linear : s_Nearest;
     if (s_Window != NULL &&
         !SDL_WaitAndAcquireGPUSwapchainTexture(command, s_Window, &swapchain, &swapchain_width, &swapchain_height)) {
         Host_Fatal("the window's picture: %s", SDL_GetError());

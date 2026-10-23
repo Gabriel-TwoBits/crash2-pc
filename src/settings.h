@@ -38,6 +38,9 @@ extern Setting g_Settings[SETTING_COUNT];
 
 /* The resolution's multiple of the PlayStation's, 1 its own (the software picture) */
 int Host_ResolutionScale(void);
+/* A setting's value: the GPU renderer reads them through it, which the 64-bit build's renderer, outside the game's
+ * memory, also has */
+int Host_Setting(int index);
 void Host_LoadSettings(void);
 void Host_SaveSettings(void);
 

@@ -10,6 +10,9 @@
 #define VRAM_HEIGHT 512
 
 extern uint16_t g_Vram[VRAM_HEIGHT][VRAM_WIDTH];
+/* The VRAM's words, row after row: the GPU renderer reads them through it, which the 64-bit build's renderer, outside
+ * the game's memory, also has */
+const uint16_t *Host_Vram(void);
 
 /* One word to GP0, as the CPU or the DMA writes it */
 void Gpu_Write(uint32_t word);
