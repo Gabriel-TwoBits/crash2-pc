@@ -323,3 +323,11 @@ matching"):
       A frame is shown at its display environment's corner: the drawing area's, 12 lines lower on the memory card's
       screens, shook the picture.
 14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
+15. **Players' bugs, by their recorded runs.** A player records a run in the window (`CRASH2_GAME_CLOCK_RECORD`,
+    CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
+    the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
+    words where `func_80024658` writes 8, the retail frame's spare words under them, the host's frame the player's
+    position (crash2-decomp 5a565c4). The decompilation's PCSX-Redux runs don't follow such a recording (the
+    PlayStation's disc reads in real time move its game frames from the opening's screens on). Open: some textures
+    flicker, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off, not yet told
+    apart between the GPU renderer and the steady polygons (RES PS1, then WOBBLE and WARPING on), nor recorded.
