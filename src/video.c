@@ -18,7 +18,6 @@
  * renderer still draws (a test's); CRASH2_DUMP=DIR writes the display every CRASH2_DUMP_EVERY blanks (60 by default)
  * from blank CRASH2_DUMP_FROM (0 by default) as DIR/blank_N.ppm, all of VRAM with CRASH2_DUMP_VRAM set */
 
-#define HEADLESS_VARIABLE "CRASH2_HEADLESS"
 #define HEADLESS_GPU_VARIABLE "CRASH2_HEADLESS_GPU"
 /* SDL's video driver with no display, whose Vulkan the GPU renderer takes headless */
 #define OFFSCREEN_DRIVER "offscreen"
@@ -76,7 +75,7 @@ static void start(void) {
     } else {
         /* Allocated */
     }
-    s_Headless = getenv(HEADLESS_VARIABLE) != NULL;
+    s_Headless = Host_Headless();
     s_DumpDirectory = getenv(DUMP_VARIABLE);
     s_DumpVram = getenv(DUMP_VRAM_VARIABLE) != NULL;
     if (every != NULL && atoi(every) > 0) {

@@ -10,7 +10,6 @@
  * file CRASH2_SETTINGS names. Headless (CRASH2_HEADLESS) only the latter: a test run leaves the player's file alone */
 
 #define SETTINGS_FILE "settings.ini"
-#define HEADLESS_VARIABLE "CRASH2_HEADLESS"
 #define FILE_VARIABLE "CRASH2_SETTINGS"
 #define PATH_BYTES 4096
 #define LINE_BYTES 256
@@ -50,7 +49,7 @@ static int settings_path(char *path, size_t bytes) {
 
     if (named != NULL) {
         return snprintf(path, bytes, "%s", named) < (int)bytes;
-    } else if (getenv(HEADLESS_VARIABLE) != NULL) {
+    } else if (Host_Headless()) {
         return 0;
     } else {
         return Host_PreferencePath(SETTINGS_FILE, path, bytes) == 0;

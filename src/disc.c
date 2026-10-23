@@ -13,7 +13,6 @@
  * be named; a dialog closed without one ends the program */
 
 #define DISC_VARIABLE "CRASH2_DISC"
-#define HEADLESS_VARIABLE "CRASH2_HEADLESS"
 #define REMEMBERED_FILE "disc.txt"
 #define PATH_BYTES 4096
 #define WAIT_MS 10
@@ -88,7 +87,7 @@ const char *Host_ChooseDisc(int argc, char **argv) {
         return argv[1];
     } else if ((disc = getenv(DISC_VARIABLE)) != NULL) {
         return disc;
-    } else if (getenv(HEADLESS_VARIABLE) != NULL) {
+    } else if (Host_Headless()) {
         Host_Fatal("usage: crash2 DISC.cue (or DISC.iso), or " DISC_VARIABLE " set to it");
     } else if (have_remember && (disc = remembered(remember_path)) != NULL) {
         return disc;

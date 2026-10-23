@@ -6,5 +6,7 @@
 __attribute__((format(printf, 1, 2))) void Host_Log(const char *format, ...);
 __attribute__((noreturn, format(printf, 1, 2))) void Host_Fatal(const char *format, ...);
 void Host_InHandler(int inside);
+/* Whether the program runs with no window for a player (CRASH2_HEADLESS) */
+int Host_Headless(void);
 
 #endif /* HOST_LOG_H */
