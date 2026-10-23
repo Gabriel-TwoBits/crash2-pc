@@ -279,8 +279,16 @@ matching"):
     Turtle Woods, Crash's before the walls behind him) keep a projection each; a polygon's vertex takes the one whose
     depth is nearest its other vertices'. Taking the later alone, 2.2% of the vertices drawn took another's, and their
     polygons' textures flickered as Crash moved. TRADEOFF: following each value through the game's memory (PGXP) would
-    tell them apart for sure. Both are options, off
-    as the PlayStation draws, shown with the GPU renderer.
+    tell them apart for sure. Both are options, off as the PlayStation draws, shown with the GPU renderer.
+    - **Kept within the GTE's limits:** a projection was first kept only when its position came within 1.5 pixels of
+      the GTE's, but the GTE floors IR1-2 before it multiplies (up to H / SZ3 pixels more) and its division errs more
+      far from the screen's centre, so near vertices (H 288 and z some 400 on Snow Go's path, 1.7 pixels) and those
+      off the screen were dropped, their polygons drawn as written beside steady neighbours: on the recorded Snow Go
+      run at 8×, 63,481 of 3.2 million polygons drawn had some vertices and not others, switching between the two as
+      their vertices crossed the tolerance, and the pause screen's crystal and gem had black wedges and broken facets. A projection is now
+      kept unless the GTE saturated IR1-2, SZ3 or the position or its division overflowed: 4,959 left (the positions
+      past the screen's limits among them), the models as the software picture draws them. The slots' probes full (180 times on
+      that run), the frame already drawn gives up its projection rather than the frame being built.
 12. **Widescreen (done).** The shape's third value, 16:9: decomp's GTE model lets a host narrow each projection's
     horizontal offset from the screen's centre (`GTE_HORIZONTAL`, crash2-decomp f7eb8a3), which the port does by 3/4,
     and the picture is shown at 16:9, so a 4:3 picture's worth of the world takes three quarters of the width and the
@@ -332,6 +340,7 @@ matching"):
     on Z, where its path has property 0x252) the host's frame put `new_var` on the row's third value, so `scale` was
     always the second's low half (crash2-decomp f375744). The demo's, the card's and the Snow Go run's frames, sound
     and card are the same with it: none of them reaches the property. The decompilation's PCSX-Redux runs don't follow such a recording (the
-    PlayStation's disc reads in real time move its game frames from the opening's screens on). Open: some textures
-    flicker, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off, not yet told
-    apart between the GPU renderer and the steady polygons (RES PS1, then WOBBLE and WARPING on), nor recorded.
+    PlayStation's disc reads in real time move its game frames from the opening's screens on). Some textures
+    flickered, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off: polygons
+    falling back from the steady ones as their vertices crossed the 1.5 pixels' tolerance (milestone 11, "Kept within
+    the GTE's limits"); whether that was all of it is for the player's eye.
