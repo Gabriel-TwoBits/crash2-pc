@@ -168,6 +168,10 @@ target_include_directories(${PORT} PRIVATE src ${CMAKE_BINARY_DIR}/sdk ${CMAKE_B
 # SwanStation's rasterizer (third_party/swanstation/README.md), C++17 as it is written
 target_include_directories(${PORT} PRIVATE src/spu_shim third_party/swanstation third_party/swanstation/core)
 target_compile_options(${PORT} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:-std=c++17 ${HOST_PIC}>)
+# The port's own C++ warns as its C does; SwanStation's stays as it is written. Its draw commands end in a zero-length
+# array, which src/gpu_raster.cpp's buffers size and GCC can't see
+set_source_files_properties(src/spu_host.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra")
+set_source_files_properties(src/gpu_raster.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wno-array-bounds")
 target_link_libraries(${PORT} PRIVATE SDL3::SDL3-shared m)
 # libgte's functions run decomp's GTE model (include/gte.h): compiled with the game's C's semantics, optimized
 set_source_files_properties(src/psyq/libgte.c PROPERTIES
