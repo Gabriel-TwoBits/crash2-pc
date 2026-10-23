@@ -49,10 +49,13 @@ if(WIN32)
 else()
     set(HOST_DATA_FORMAT)
 endif()
+# The read-only blocks it writes are those the decompilation's C names (INCLUDE_RODATA), which the compiler's own
+# dependencies don't follow: it runs again on a change to that C
+file(GLOB_RECURSE DECOMP_SOURCES CONFIGURE_DEPENDS ${DECOMP}/src/*.c)
 add_custom_command(
     OUTPUT ${HOST_DATA} ${HOST_ASM}/macro.inc
     COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/host_data.py ${DECOMP} ${HOST_ASM} ${HOST_DATA_FORMAT}
-    DEPENDS ${CMAKE_SOURCE_DIR}/tools/host_data.py ${SPLIT_DATA}
+    DEPENDS ${CMAKE_SOURCE_DIR}/tools/host_data.py ${SPLIT_DATA} ${DECOMP_SOURCES}
     COMMENT "Rewriting the split's data for the host")
 add_custom_target(host_data DEPENDS ${HOST_DATA} ${HOST_ASM}/macro.inc)
 
