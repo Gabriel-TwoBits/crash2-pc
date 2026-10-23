@@ -42,8 +42,6 @@ typedef struct {
 #define HALF_BITS 16
 #define HALF_MASK 0xFFFF
 #define OTZ_SHIFT 2
-#define IR_MIN (-0x8000)
-#define IR_MAX 0x7FFF
 
 static u32 pair(s32 low, s32 high) {
     return ((u32)low & HALF_MASK) | ((u32)high << HALF_BITS);
@@ -150,17 +148,8 @@ Matrix *TransMatrix(Matrix *m, Vector *v) {
     return m;
 }
 
-static s32 saturated(s32 value) {
-    if (value < IR_MIN) {
-        return IR_MIN;
-    } else if (value > IR_MAX) {
-        return IR_MAX;
-    } else {
-        return value;
-    }
-}
-
-/* v1 = the rotation matrix x v0 + the translation, as IR1-3 (saturated), and the flag in *flag.
+/* v1 = the rotation matrix x v0 + the translation, as MAC1-3 (the retail function stores those, not IR1-3's saturated
+ * values), and the flag in *flag.
  * TRADEOFF: the flag holds 0, without the bits MVMVA would set on an overflow */
 Vector *RotTrans(SVector *v0, Vector *v1, s32 *flag) {
     u32 words[GTE_DIMENSION + 2];
@@ -188,7 +177,7 @@ Vector *RotTrans(SVector *v0, Vector *v1, s32 *flag) {
 
             sum += (s64)element * vector[column];
         }
-        (&v1->vx)[row] = saturated((s32)(sum >> FRACTION_SHIFT));
+        (&v1->vx)[row] = (s32)(sum >> FRACTION_SHIFT);
     }
     *flag = 0;
     return v1;
