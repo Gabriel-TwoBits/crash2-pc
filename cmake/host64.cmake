@@ -33,7 +33,12 @@ FetchContent_Declare(wasi_sdk
 FetchContent_Declare(wabt
     URL https://github.com/WebAssembly/wabt/releases/download/1.0.42/${WABT_ASSET}
     URL_HASH SHA256=${WABT_SHA256})
-FetchContent_MakeAvailable(wasi_sdk wabt)
+# wasi-sdk makes the module; a module made elsewhere needs only wasm2c's runtime
+if(CRASH2_MODULE_DIR)
+    FetchContent_MakeAvailable(wabt)
+else()
+    FetchContent_MakeAvailable(wasi_sdk wabt)
+endif()
 set(WASM2C_RUNTIME ${wabt_SOURCE_DIR}/share/wabt/wasm2c)
 
 # The licences of what the program carries beyond the port's and SDL's, which the packages carry (tools/*/build.sh,
@@ -58,29 +63,40 @@ while(WASI_LIBC_LICENSE_PARTS)
     file(APPEND ${LICENSES}/LICENSE-wasi-libc.txt "==== wasi-libc: ${part} ====\n\n${part_text}\n")
 endwhile()
 
-# The module: every host source but the GPU renderer (native) and the 32-bit build's own
-set(MODULE ${CMAKE_BINARY_DIR}/module)
-set(MODULE_HOST_SOURCES
-    src/main.c src/disc.c src/preferences.c src/audio.c src/game_clock.c src/gool.c src/menus.c src/settings.c
-    src/host_log.c src/input.c src/gpu.c src/precise.c src/between.c src/gte.c src/low_ram.c src/sampler.c src/mips.c
-    src/sdk.c src/retail_data.c src/native.c src/handwritten.c src/video.c src/psyq/events.c src/psyq/libc.c
-    src/psyq/libcd.c src/psyq/libgpu.c src/psyq/libgte.c src/psyq/pad.c src/psyq/stubs.c src/psyq/card.c
-    src/gpu_raster.cpp src/spu_host.cpp third_party/swanstation/core/gpu_sw_backend.cpp
-    third_party/swanstation/core/spu.cpp)
-file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${DECOMP}/src/game/*.c)
-file(GLOB_RECURSE MODULE_HEADERS CONFIGURE_DEPENDS ${DECOMP}/include/*.h ${CMAKE_SOURCE_DIR}/src/*.h
-    ${CMAKE_SOURCE_DIR}/third_party/swanstation/*.h)
-file(GLOB MODULE_SCRIPTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/wasm/*.py)
-file(GLOB_RECURSE SDK_ASM CONFIGURE_DEPENDS ${DECOMP}/asm/sdk/*.s)
-add_custom_command(
-    OUTPUT ${MODULE}/crash2_module.c ${MODULE}/crash2_module.h
-    COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/wasm/module.py --wasi-sdk ${wasi_sdk_SOURCE_DIR}
-        --wasm2c ${wabt_SOURCE_DIR}/bin/wasm2c --sdl-include ${sdl3_SOURCE_DIR}/include --out ${MODULE}
-        --host ${MODULE_HOST_SOURCES}
-    DEPENDS ${MODULE_SCRIPTS} ${CMAKE_SOURCE_DIR}/tools/sdk_symbols.py ${MODULE_HOST_SOURCES} ${GAME_SOURCES}
-        ${MODULE_HEADERS} ${SPLIT_DATA} ${SDK_ASM}
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
-    COMMENT "Building the module: the game's C and the host's, wasm32, through wasm2c")
+if(CRASH2_MODULE_DIR)
+    set(MODULE ${CRASH2_MODULE_DIR})
+    foreach(file crash2_module.c crash2_module.h)
+        if(NOT EXISTS ${MODULE}/${file})
+            message(FATAL_ERROR "${MODULE}/${file} is missing: CRASH2_MODULE_DIR is tools/wasm/module.py's --out")
+        else()
+            message(STATUS "Module: ${MODULE}/${file}")
+        endif()
+    endforeach()
+else()
+    # The module: every host source but the GPU renderer (native) and the 32-bit build's own
+    set(MODULE ${CMAKE_BINARY_DIR}/module)
+    set(MODULE_HOST_SOURCES
+        src/main.c src/disc.c src/preferences.c src/audio.c src/game_clock.c src/gool.c src/menus.c src/settings.c
+        src/host_log.c src/input.c src/gpu.c src/precise.c src/between.c src/gte.c src/low_ram.c src/sampler.c
+        src/mips.c src/sdk.c src/retail_data.c src/native.c src/handwritten.c src/video.c src/psyq/events.c
+        src/psyq/libc.c src/psyq/libcd.c src/psyq/libgpu.c src/psyq/libgte.c src/psyq/pad.c src/psyq/stubs.c
+        src/psyq/card.c src/gpu_raster.cpp src/spu_host.cpp third_party/swanstation/core/gpu_sw_backend.cpp
+        third_party/swanstation/core/spu.cpp)
+    file(GLOB GAME_SOURCES CONFIGURE_DEPENDS ${DECOMP}/src/game/*.c)
+    file(GLOB_RECURSE MODULE_HEADERS CONFIGURE_DEPENDS ${DECOMP}/include/*.h ${CMAKE_SOURCE_DIR}/src/*.h
+        ${CMAKE_SOURCE_DIR}/third_party/swanstation/*.h)
+    file(GLOB MODULE_SCRIPTS CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/tools/wasm/*.py)
+    file(GLOB_RECURSE SDK_ASM CONFIGURE_DEPENDS ${DECOMP}/asm/sdk/*.s)
+    add_custom_command(
+        OUTPUT ${MODULE}/crash2_module.c ${MODULE}/crash2_module.h
+        COMMAND Python3::Interpreter ${CMAKE_SOURCE_DIR}/tools/wasm/module.py --wasi-sdk ${wasi_sdk_SOURCE_DIR}
+            --wasm2c ${wabt_SOURCE_DIR}/bin/wasm2c --sdl-include ${sdl3_SOURCE_DIR}/include --out ${MODULE}
+            --host ${MODULE_HOST_SOURCES}
+        DEPENDS ${MODULE_SCRIPTS} ${CMAKE_SOURCE_DIR}/tools/sdk_symbols.py ${MODULE_HOST_SOURCES} ${GAME_SOURCES}
+            ${MODULE_HEADERS} ${SPLIT_DATA} ${SDK_ASM}
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Building the module: the game's C and the host's, wasm32, through wasm2c")
+endif()
 
 add_executable(crash2 ${MODULE}/crash2_module.c ${WASM2C_RUNTIME}/wasm-rt-impl.c ${WASM2C_RUNTIME}/wasm-rt-mem-impl.c
     ${WASM2C_RUNTIME}/wasm-rt-exceptions-impl.c src/host64/main.c src/host64/bridge.c src/host64/wasi.c src/render.c)
@@ -99,6 +115,14 @@ if(WIN32)
     add_custom_command(TARGET crash2 POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:crash2>
         COMMENT "Copying SDL3.dll beside the program")
+elseif(APPLE)
+    # SDL3's library beside the program in the build, in the Frameworks of the app's bundle (tools/macos/bundle.sh)
+    set_target_properties(crash2 PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE
+        INSTALL_RPATH "@executable_path;@executable_path/../Frameworks")
+    add_custom_command(TARGET crash2 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_SONAME_FILE:SDL3::SDL3-shared>
+            $<TARGET_FILE_DIR:crash2>
+        COMMENT "Copying SDL3's library beside the program, by the name it is loaded by")
 else()
     set_target_properties(crash2 PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
 endif()

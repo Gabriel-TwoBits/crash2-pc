@@ -1,0 +1,67 @@
+# The macOS build (docs/ROADMAP.md, milestone 16). The module comes from where the decompilation is split, which takes
+# the player's disc (tools/wasm/module.py): crash2-module.tar.gz, its crash2_module.c and crash2_module.h, an asset of
+# a draft release. The runner compiles the program around it for Apple silicon and Intel, puts the shaders' MSL
+# through Metal's compiler, builds the app (tools/macos/bundle.sh), starts it as far as it goes without a disc, and
+# adds crash2-pc-macos.zip to the same draft release.
+name: macOS
+
+on:
+  workflow_dispatch:
+    inputs:
+      release:
+        description: The draft release holding crash2-module.tar.gz, which receives crash2-pc-macos.zip
+        required: true
+      version:
+        description: The version the app names
+        required: true
+
+permissions:
+  # A draft release's assets
+  contents: write
+
+jobs:
+  app:
+    runs-on: macos-15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE: ${{ inputs.release }}
+      VERSION: ${{ inputs.version }}
+    steps:
+      - name: Check out the commit
+        run: |
+          git init -q .
+          git fetch -q --depth 1 "https://github.com/$GITHUB_REPOSITORY" "$GITHUB_SHA"
+          git checkout -q FETCH_HEAD
+      - name: Tools
+        run: brew install ninja glslang spirv-cross
+      - name: The module
+        run: |
+          gh release download "$RELEASE" --repo "$GITHUB_REPOSITORY" --pattern crash2-module.tar.gz --dir module
+          tar -xzf module/crash2-module.tar.gz -C module
+      - name: Build
+        run: |
+          cmake -S . -B build-macos -G Ninja -DCRASH2_MODULE_DIR="$PWD/module" \
+            -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" -DCMAKE_OSX_DEPLOYMENT_TARGET=10.15
+          cmake --build build-macos
+      - name: The shaders through Metal's compiler
+        run: |
+          for shader in build-macos/shaders/*.metal; do
+            xcrun -sdk macosx metal -c "$shader" -o "${shader%.metal}.air"
+          done
+      - name: The app
+        run: sh tools/macos/bundle.sh build-macos "$VERSION"
+      - name: Started without a disc, on each architecture the runner runs
+        run: |
+          PROGRAM=build-macos/crash2-pc.app/Contents/MacOS/crash2
+          lipo -archs "$PROGRAM"
+          for architecture in arm64 x86_64; do
+            if arch "-$architecture" /usr/bin/true 2>/dev/null; then
+              CRASH2_HEADLESS=1 arch "-$architecture" "$PROGRAM" /no-disc.cue > "start-$architecture.txt" 2>&1 || true
+              cat "start-$architecture.txt"
+              grep -q "fatal: can't open the disc image /no-disc.cue" "start-$architecture.txt"
+            else
+              echo "$architecture: not run here"
+            fi
+          done
+      - name: Into the draft release
+        run: gh release upload "$RELEASE" build-macos/crash2-pc-macos.zip --repo "$GITHUB_REPOSITORY" --clobber
