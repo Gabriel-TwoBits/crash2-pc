@@ -97,7 +97,8 @@ matching"):
      10,041 runs agree: 669 of the 1,406 distinct blocks, by 900 paths. With `slt` made unsigned on purpose, 33 of 5,544
      differ.
    - **Left:** the blocks no demo level runs, with the levels played.
-6. **The picture (in progress).** The display in an SDL3 window, from a GPU in software.
+6. **The picture (done).** The display in an SDL3 window, from a GPU in software. What it left, the CD's timing and the
+   game's C at -O2, concerns the tools' comparisons with the PS1 and the speed, not play: milestone 14 carries both.
    - **GPU:** `src/gpu.c` holds the 1024×512 VRAM, reads the GP0 commands (psx-spx) and keeps the drawing state (E1
      to E6). SwanStation's software rasterizer draws (`third_party/swanstation`, GPL-3.0, from Mednafen's): polygons,
      lines, rectangles, fills, copies and loads with the GPU's own stepping, dithering, semi-transparency and mask.
@@ -344,7 +345,12 @@ matching"):
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
     words where `func_80024658` writes 8, the retail frame's spare words under them, the host's frame the player's
-    position (crash2-decomp 5a565c4). The same, found by reading: four callers gave `Ent_GetProperty`'s interpolated
+    position (crash2-decomp 5a565c4). Paths where the retail code reads what its callers left (a callee-saved
+    register, a stack slot), which equivalent C has no value for, call decomp's `CALLER_LEFT`, which the port logs once
+    per function (crash2-decomp 8e80c4a): of the six such functions, only `func_8002DFA8` ran on the demo, the card's
+    and the Snow Go run, and on every call, its first row comparing with the `$s1` `func_8002E280` leaves, its search's
+    last `ny`, now passed to it on the host (`PASSED_ON`, crash2-decomp 30ced94); then none on those runs nor on
+    run_game's new-game and turtle-woods schedules played on the port. The same, found by reading: four callers gave `Ent_GetProperty`'s interpolated
     row a word where the retail frames hold two and the row takes up to 8 bytes; in `func_800224A0` (the camera's pull
     on Z, where its path has property 0x252) the host's frame put `new_var` on the row's third value, so `scale` was
     always the second's low half (crash2-decomp f375744). The demo's, the card's and the Snow Go run's frames, sound
