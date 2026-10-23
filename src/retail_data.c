@@ -2,7 +2,7 @@
 #include <string.h>
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif !defined(__wasi__)
 #include <sys/mman.h>
 #include <unistd.h>
 #endif
@@ -36,7 +36,10 @@ static void copy(const RetailRun *run, const uint8_t *image, uint32_t bytes) {
 
 /* A read-only run's pages writable for its copy, then as they were */
 static void copy_read_only(const RetailRun *run, const uint8_t *image, uint32_t bytes) {
-#ifdef _WIN32
+#if defined(__wasi__)
+    /* Spike: a module's memory has no protections */
+    copy(run, image, bytes);
+#elif defined(_WIN32)
     DWORD old;
     DWORD unused;
 

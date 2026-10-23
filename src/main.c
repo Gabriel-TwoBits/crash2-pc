@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #ifdef _WIN32
 #include <windows.h>
-#else
+#elif !defined(__wasi__)
 #include <sys/mman.h>
 #endif
 
@@ -70,6 +70,7 @@ static unsigned char *heap_base(void) {
 extern char __window_rest_start[];
 extern char __window_rest_end[];
 
+#ifndef __wasi__
 /* The program in the window, the window's rest unreadable: the game's access past its image faults (low_ram.c
  * reports it) */
 static int protect(void *start, unsigned int bytes) {
@@ -82,6 +83,14 @@ static int protect(void *start, unsigned int bytes) {
 #endif
 }
 
+#endif
+
+#ifdef __wasi__
+/* Spike: the module's memory holds the game's from 0x80070000 (tools/wasm-spike/build.sh), with no linker script and no
+ * pages to protect; its layout is checked from the link's map */
+static void check_window(void) {
+}
+#else
 static void check_window(void) {
     unsigned int first = PROGRAM_START;
     unsigned int last = (unsigned int)(uintptr_t)__window_rest_start;
@@ -96,6 +105,7 @@ static void check_window(void) {
         Host_Log("the program spans 0x%08X to 0x%08X, the window reserved past it", first, last);
     }
 }
+#endif
 
 #ifdef _WIN32
 /* On Windows the port is a library at 0x80000000 that crash2.exe loads and enters here (src/launcher.c) */

@@ -3,3 +3,4 @@ build-linux/
 build-windows/
 .venv/
 __pycache__/
+/wbuild/

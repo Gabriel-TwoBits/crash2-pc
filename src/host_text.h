@@ -17,8 +17,16 @@ extern char __etext[];
 #define HOST_TEXT_END __etext
 #endif
 
+#ifdef __wasi__
+/* Spike: a module's function pointer is its index in the function table, a small number */
+#define WASM_TABLE_LIMIT 0x10000
+static inline int Host_InOwnCode(uint32_t address) {
+    return address != 0 && address < WASM_TABLE_LIMIT;
+}
+#else
 static inline int Host_InOwnCode(uint32_t address) {
     return address >= (uint32_t)(uintptr_t)HOST_TEXT_START && address < (uint32_t)(uintptr_t)HOST_TEXT_END;
 }
+#endif
 
 #endif /* HOST_TEXT_H */
