@@ -118,7 +118,8 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
         dx = x - (double)(int16_t)(sxy & HALF_MASK);
         dy = y - (double)(int16_t)(sxy >> HALF_SHIFT);
     }
-    /* Kept: its own slot, else a free or old one along the probes, else the first */
+    /* Kept: its own slot, else a free or old one along the probes, else the last frame's first (drawn by now), else the
+     * first */
     for (probe = 0; probe < PROBES; probe++) {
         Slot *candidate = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
 
@@ -128,6 +129,20 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
         } else {
             continue;
         }
+    }
+    if (probe == PROBES) {
+        for (probe = 0; probe < PROBES; probe++) {
+            Slot *candidate = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
+
+            if (candidate->generation != s_Generation) {
+                slot = candidate;
+                break;
+            } else {
+                continue;
+            }
+        }
+    } else {
+        /* Found along the probes */
     }
     if (slot->key != sxy || slot->generation != s_Generation) {
         slot->key = sxy;
