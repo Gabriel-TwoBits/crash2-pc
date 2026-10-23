@@ -43,6 +43,26 @@ void Host_InputStart(void) {
     s_Enabled = 1;
 }
 
+/* Another gamepad still connected, if any, in place of the one removed */
+static void open_another(SDL_JoystickID removed) {
+    int count;
+    int index;
+    SDL_JoystickID *gamepads = SDL_GetGamepads(&count);
+
+    if (gamepads == NULL) {
+        return;
+    } else {
+        for (index = 0; index < count && s_Gamepad == NULL; index++) {
+            if (gamepads[index] != removed) {
+                s_Gamepad = SDL_OpenGamepad(gamepads[index]);
+            } else {
+                continue;
+            }
+        }
+        SDL_free(gamepads);
+    }
+}
+
 void Host_InputEvent(const SDL_Event *event) {
     if (event->type == SDL_EVENT_GAMEPAD_ADDED && s_Gamepad == NULL) {
         s_Gamepad = SDL_OpenGamepad(event->gdevice.which);
@@ -50,6 +70,7 @@ void Host_InputEvent(const SDL_Event *event) {
                SDL_GetGamepadID(s_Gamepad) == event->gdevice.which) {
         SDL_CloseGamepad(s_Gamepad);
         s_Gamepad = NULL;
+        open_another(event->gdevice.which);
     } else {
         /* Not a gamepad's coming or going */
     }
