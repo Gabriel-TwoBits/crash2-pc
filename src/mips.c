@@ -121,6 +121,9 @@ enum {
 /* TRADEOFF: a call runs at most this many instructions, a guard against an interpreter bug looping forever */
 #define CALL_MAX_STEPS 50000000L
 #define HOOKS_MAX 32
+/* A bit for each word of the image's code, set where a hook is: the fetch tests it before looking the hook up */
+#define IMAGE_CODE_WORDS ((RETAIL_DATA_START - RETAIL_CODE_START) / WORD_BYTES)
+#define BITS_PER_HOOK_WORD 32
 
 static const uint8_t *s_Image;
 static uint32_t s_ImageEnd;
@@ -128,6 +131,7 @@ static const MipsIo *s_Io;
 static uint32_t s_HookAddress[HOOKS_MAX];
 static MipsHook s_Hook[HOOKS_MAX];
 static int s_Hooks;
+static uint32_t s_HookBits[(IMAGE_CODE_WORDS + BITS_PER_HOOK_WORD - 1) / BITS_PER_HOOK_WORD];
 static uint32_t s_Stack[STACK_WORDS];
 static MipsCpu *s_Active;
 static void (*s_Pending)(void);
@@ -154,18 +158,30 @@ static void deliver_pending(void) {
 }
 
 void Mips_AddHook(uint32_t address, MipsHook hook) {
+    uint32_t word = (address - RETAIL_CODE_START) / WORD_BYTES;
+
     if (s_Hooks >= HOOKS_MAX) {
         Host_Fatal("more than %d hooks on the interpreter", HOOKS_MAX);
+    } else if (address < RETAIL_CODE_START || address >= RETAIL_DATA_START || address % WORD_BYTES != 0) {
+        Host_Fatal("a hook at 0x%08X, not a word of the image's code", address);
     } else {
         s_HookAddress[s_Hooks] = address;
         s_Hook[s_Hooks] = hook;
         s_Hooks++;
+        s_HookBits[word / BITS_PER_HOOK_WORD] |= 1u << (word % BITS_PER_HOOK_WORD);
     }
 }
 
+/* Of an address in the image's code */
 static MipsHook hook_at(uint32_t address) {
+    uint32_t word = (address - RETAIL_CODE_START) / WORD_BYTES;
     int index;
 
+    if (!(s_HookBits[word / BITS_PER_HOOK_WORD] & (1u << (word % BITS_PER_HOOK_WORD)))) {
+        return NULL;
+    } else {
+        /* Looked up below */
+    }
     for (index = 0; index < s_Hooks; index++) {
         if (s_HookAddress[index] == address) {
             return s_Hook[index];
