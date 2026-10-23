@@ -69,8 +69,12 @@ cmake --build build64
 build64/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 ```
 
-So far built and checked on Linux x86-64 only. On a Mac the GPU renderer's shaders are SPIR-V, which Metal doesn't
-take: the game shows the PlayStation's picture there until they are translated.
+Checked on Linux x86-64, and for Windows x86-64 under Wine (below): the same frames, sound and saves as the 32-bit
+build, and the same pictures from the GPU renderer. On macOS the GPU renderer takes its shaders in Metal's MSL,
+translated from their SPIR-V by SPIRV-Cross (Homebrew's `spirv-cross` and `glslang`). The Mac app is built on GitHub's
+macOS runner (`.github/workflows/macos.yml`) for Apple silicon and Intel, macOS 10.15 on, around a module made on Linux
+(`-DCRASH2_MODULE_DIR`), since the split needs your disc: there Metal's compiler takes the shaders and the program
+starts on both, but it hasn't been played on a Mac yet.
 
 ### Linux's AppImage
 
@@ -82,17 +86,18 @@ runs on a 64-bit Linux with no 32-bit library installed, X11 or Wayland, PulseAu
 
 ### Windows
 
-The Windows build is cross-compiled on Linux, in a container that holds its tools (MinGW-w64's 32-bit GCC, CMake and
+The Windows builds are cross-compiled on Linux, in a container that holds their tools (MinGW-w64's GCC, CMake and
 Wine), so nothing is installed on the machine: with podman or docker, once the decompilation is split as above,
 
 ```sh
 tools/windows/build.sh
 ```
 
-makes `build-windows/crash2-pc-windows.zip`: `crash2.exe`, `crash2-game.dll`, `SDL3.dll` and the licences. On Windows,
-open `crash2.exe`, or drop the disc image's `.cue` onto it. It needs 64-bit Windows: the game sits at 0x80000000,
-which only a 64-bit system gives a 32-bit program. Tried under Wine so far, where it plays
-the PlayStation's frames as the Linux build does, not on Windows itself.
+makes `build-windows64/crash2-pc-windows-x86_64.zip`, the 64-bit build (`crash2.exe`, `SDL3.dll` and the licences),
+and `build-windows/crash2-pc-windows.zip`, the 32-bit one (`crash2.exe`, `crash2-game.dll`, `SDL3.dll` and the
+licences). On Windows, open `crash2.exe`, or drop the disc image's `.cue` onto it. Both need 64-bit Windows: the
+32-bit build's game sits at 0x80000000, which only a 64-bit system gives a 32-bit program. Tried under Wine so far,
+where both play the PlayStation's frames as the Linux build does, not on Windows itself.
 
 ## Playing
 
@@ -129,12 +134,15 @@ in `settings.ini` beside the memory card:
 
 The resolution takes Vulkan from the system's driver: the 64-bit build from its 64-bit one; the 32-bit build on Linux
 from the i386 Vulkan packages (`libvulkan1:i386` and `mesa-vulkan-drivers:i386` on Debian, what Steam installs too), on
-Windows from the graphics card's driver. Without it the game shows the PlayStation's picture, and the options leave out
-the resolution, the steadiness and the perspective.
+Windows from the graphics card's driver. On macOS it takes Metal. Without them the game shows the PlayStation's
+picture, and the options leave out the resolution, the steadiness and the perspective.
+
+The Mac app is signed ad hoc, without an Apple Developer ID: the first time, macOS refuses to open it, and System
+Settings, Privacy & Security, "Open Anyway" allows it from then on.
 
 The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
-`%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.
-`CRASH2_MEMORY_CARD=FILE` uses another.
+`%APPDATA%`, on macOS under `~/Library/Application Support`): a 128 KB card image, the format emulators and card
+tools use, so a save moves between them. `CRASH2_MEMORY_CARD=FILE` uses another.
 
 ## How it's made: AI-assisted
 

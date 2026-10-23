@@ -361,18 +361,18 @@ matching"):
     the resolution with WOBBLE and WARPING off: polygons falling back from the steady ones as their vertices crossed the
     1.5 pixels' tolerance (milestone 11, "Kept within the GTE's limits"); whether that was all of it is for the player's
     eye.
-16. **64-bit through wasm (done on Linux).** The game's C needs 32-bit pointers (decision 1), which macOS and a 64-bit
-    system's libraries no longer give: wasm32 keeps them, and wasm2c turns a wasm module into C any 64-bit system
-    compiles. On a 64-bit target CMake builds that way (`cmake/host64.cmake`): `tools/wasm/module.py` compiles the
-    game's C and the host's, all but the GPU renderer, with wasi-sdk 34's clang for wasm32, links them at the game's
-    addresses and turns the module into C with WABT 1.0.42's wasm2c (both fetched, pinned by SHA-256, for Linux x86-64
-    and ARM, macOS on Apple silicon and Windows x86-64); the program compiles it with `src/host64` (WASI's files and
-    clocks, SDL for the module, `main`) and the GPU renderer, `src/render.c`, natively on 64-bit SDL3. On Linux x86-64
-    the demo's 6,000 game frames, the card's run and the Snow Go run write the same `game_frames.txt`, SPU log and card
-    as the 32-bit build, the GPU renderer's pictures at 8× are the same, and so are a run at 60 frames a second and
-    16:9 and windowed runs (software and GPU) on Xvfb; some 10% sooner (9.3 s for the demo, 10.7 s).
-    `tools/linux/build.sh` also makes `crash2-pc-linux-x86_64.AppImage`, whose GPU renderer takes the system's 64-bit
-    Vulkan.
+16. **64-bit through wasm (done on Linux and Windows; macOS built, not played).** The game's C needs 32-bit pointers
+    (decision 1), which macOS and a 64-bit system's libraries no longer give: wasm32 keeps them, and wasm2c turns a wasm
+    module into C any 64-bit system compiles. On a 64-bit target CMake builds that way (`cmake/host64.cmake`):
+    `tools/wasm/module.py` compiles the game's C and the host's, all but the GPU renderer, with wasi-sdk 34's clang for
+    wasm32, links them at the game's addresses and turns the module into C with WABT 1.0.42's wasm2c (both fetched,
+    pinned by SHA-256, for Linux x86-64 and ARM, macOS on Apple silicon and Windows x86-64); the program compiles it
+    with `src/host64` (WASI's files and clocks, SDL for the module, `main`) and the GPU renderer, `src/render.c`,
+    natively on 64-bit SDL3. On Linux x86-64 the demo's 6,000 game frames, the card's run and the Snow Go run write the
+    same `game_frames.txt`, SPU log and card as the 32-bit build, the GPU renderer's pictures at 8× are the same, and so
+    are a run at 60 frames a second and 16:9 and windowed runs (software and GPU) on Xvfb; some 10% sooner (9.3 s for
+    the demo, 10.7 s). `tools/linux/build.sh` also makes `crash2-pc-linux-x86_64.AppImage`, whose GPU renderer takes the
+    system's 64-bit Vulkan.
     - **The data's layout:** wasm-ld has no linker script. The split's data and bss are one IR global each
       (`wasm_data.py`), every value at its retail offset and every label an alias into it, the numbers zeros that
       `src/retail_data.c` fills from the disc; between them the game's files' variables, each in a data section of its
@@ -398,6 +398,19 @@ matching"):
       32-bit build has as plain functions. A module's function pointer is its table index, so `host_text.h`'s test of
       a word holding one of the port's functions (`mips.c`'s `retail_word`) takes a small number; the module has no
       page protections and no low RAM handler (its address 0 is memory).
-    - **Left:** a Mac to build and check it on, and the GPU renderer's shaders in Metal's language there (SPIR-V only
-      so far: on a Mac the game shows the PlayStation's picture); Windows on x86-64 through this build (`wasi.c`'s files
-      are POSIX's), where the 32-bit build plays already.
+    - **Windows:** the same build cross-compiled with MinGW-w64's 64-bit GCC (`cmake/mingw-x86_64.cmake`,
+      `tools/windows/build.sh`). `wasi.c` opens and stats files through the C runtime's UTF-16 functions and reads
+      Windows' own clocks; the arguments and the environment reach the module in UTF-8, converted from Windows' UTF-16
+      (the code page's would garble a path such as `C:\Users\João`); the preopened root is a slot only, answered as a
+      directory (wasi-libc reads its rights before each open). Under Wine the demo, card and Snow Go runs write the
+      same files as Linux's, a disc under a folder named with accents opens, and the GPU renderer's picture at 4× on
+      lavapipe is Linux's to the pixel.
+    - **macOS:** SDL_GPU's Metal takes MSL: `tools/msl_shader.py` translates each shader's SPIR-V with SPIRV-Cross, its
+      resources at their SPIR-V bindings' indices, where SDL_GPU binds them, and `render.c` gives it a device that
+      takes MSL. The split needs the player's disc, which GitHub's runners haven't: the module is made on Linux and
+      put in a draft release, and `.github/workflows/macos.yml` builds the app around it (`-DCRASH2_MODULE_DIR`) for
+      arm64 and x86_64, macOS 10.15 on, signed ad hoc (`tools/macos/bundle.sh`). There the MSL goes through Metal's
+      compiler and the program starts, natively and under Rosetta, until it asks for a disc. Left: played on a Mac.
+    - **Licences:** the program carries wasm2c's runtime (WABT, Apache-2.0) and wasi-libc (with musl's, cloudlibc's
+      and musl-fts's notices), whose binary releases hold no licence: `cmake/host64.cmake` fetches the texts, pinned
+      by SHA-256, and the zips, the AppImages and the Mac app carry them.

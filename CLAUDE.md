@@ -40,7 +40,9 @@ The 64-bit build: `cmake -S . -B build64 -G Ninja` with the system's own 64-bit 
 the game's C and the host's but `src/render.c`; `src/host64` and the renderer are native. A change to the host's code
 builds and plays on both: the same `game_frames.txt`, SPU log and card from either on the same run. The module's
 imports are SDL's and the renderer's only (module.py refuses others): a new SDL call in the host's code needs its
-bridge in `src/host64/bridge.c`.
+bridge in `src/host64/bridge.c`. The module is the same C on every system; `-DCRASH2_MODULE_DIR=DIR` builds around one
+made elsewhere (module.py's `--out`), which is how `.github/workflows/macos.yml` builds the Mac app on GitHub's runner
+from a module in a draft release's `crash2-module.tar.gz` (the split needs the player's disc, which the runner hasn't).
 
 ## Running and testing
 
@@ -80,10 +82,11 @@ bridge in `src/host64/bridge.c`.
 - The AppImage: `tools/linux/build.sh` builds `build-linux/` and `build-linux/crash2-pc-linux.AppImage` in the container
   (`tools/linux/Containerfile`); `tools/linux/run.sh [--window] DISC.cue OUT NAME=VALUE...` runs it in a 64-bit
   system with no 32-bit library, `/out` being OUT, for the same checks.
-- Windows: `tools/windows/build.sh` builds `build-windows/` and its zip in the container
-  (`tools/windows/Containerfile`); `tools/windows/run.sh [--window] DISC.cue OUT NAME=VALUE...` runs it under Wine,
-  `Z:/out` being OUT. The Windows build's `game_frames.txt`, SPU log and card match the Linux build's to the byte on
-  the same run; a change to the host's code shows it on both.
+- Windows: `tools/windows/build.sh` builds `build-windows/` and `build-windows64/` and their zips in the container
+  (`tools/windows/Containerfile`); `tools/windows/run.sh [--64] [--window] DISC.cue OUT NAME=VALUE...` runs one under
+  Wine, `Z:/out` being OUT; `VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json` gives the 64-bit build's GPU
+  renderer lavapipe. The Windows builds' `game_frames.txt`, SPU log and card match the Linux build's to the byte on
+  the same run; a change to the host's code shows it on all of them.
 - Debugging: `CRASH2_SAMPLE=1` samples where the time goes; a fatal error aborts, and gdb reads its core dump
   (`coredumpctl dump`). A live gdb can't follow the game past the low RAM's single steps (`src/low_ram.c`).
 
