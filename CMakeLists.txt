@@ -1,12 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 project(Crash2PC LANGUAGES C CXX ASM)
 
-if(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
-    message(FATAL_ERROR "crash2-pc is a 32-bit build: configure with -DCMAKE_TOOLCHAIN_FILE=cmake/linux-i686.cmake")
-else()
-    message(STATUS "32-bit build")
-endif()
-
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 # Optimized, with its debugging symbols, unless a build type is asked for: left unset, SDL3's build makes it Debug,
@@ -83,6 +77,17 @@ foreach(shader draw.vert draw.frag present.vert present.frag)
     list(APPEND SHADER_HEADERS ${header})
 endforeach()
 set_source_files_properties(src/render.c PROPERTIES OBJECT_DEPENDS "${SHADER_HEADERS}")
+
+# A 64-bit system builds the game's C through wasm32 (cmake/host64.cmake); a 32-bit one as it is, below
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    message(STATUS "64-bit build, through wasm32")
+    include(cmake/host64.cmake)
+    return()
+elseif(NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
+    message(FATAL_ERROR "a ${CMAKE_SIZEOF_VOID_P}-byte pointer: crash2-pc builds for 32-bit or 64-bit systems")
+else()
+    message(STATUS "32-bit build")
+endif()
 
 # The game's C, as the decompilation's equivalent build has it, with the host's platform macros (src/host.h)
 # The retail image's order, which the link keeps (tools/check_layout.py): the split's data, each game file's small

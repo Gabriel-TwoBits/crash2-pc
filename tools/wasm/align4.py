@@ -1,5 +1,6 @@
-"""Spike: each data variable a game file defines aligned to 4 at least, as the PlayStation's GCC 2.7.2 placed them, and
-in a data section of its own even when zero (the wasm backend puts zeros in .bss): the link keeps them in order"""
+"""The 64-bit build: each data variable a game file defines aligned to 4 at least, as the PlayStation's GCC 2.7.2 placed
+them, and in a data section of its own even when zero (the wasm backend puts zeros in .bss): the link keeps them in
+order"""
 import re, sys
 # The alignment GCC 2.7.2 gave each data variable at least, in bytes
 MIN_ALIGNMENT = 4

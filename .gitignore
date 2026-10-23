@@ -4,3 +4,5 @@ build-windows/
 .venv/
 __pycache__/
 /wbuild/
+/wbuild64/
+build64/

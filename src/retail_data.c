@@ -37,7 +37,7 @@ static void copy(const RetailRun *run, const uint8_t *image, uint32_t bytes) {
 /* A read-only run's pages writable for its copy, then as they were */
 static void copy_read_only(const RetailRun *run, const uint8_t *image, uint32_t bytes) {
 #if defined(__wasi__)
-    /* Spike: a module's memory has no protections */
+    /* The 64-bit build's module: its memory has no protections */
     copy(run, image, bytes);
 #elif defined(_WIN32)
     DWORD old;

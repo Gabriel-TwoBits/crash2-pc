@@ -1,7 +1,7 @@
-"""Spike: each direct call of a game file made with the signature of its callee's definition (the game's or the host's
-IR), as C does where a prototype is in scope: each argument converted (trunc, sext or zext, inttoptr, ptrtoint), one
-too many dropped, one missing 0, the result converted back. A wasm call of another signature traps, and LLVM's own
-adapters only bitcast. Functions declared as data, for their addresses, become function declarations.
+"""The 64-bit build: each direct call of a game file made with the signature of its callee's definition (the game's or
+the host's IR), as C does where a prototype is in scope: each argument converted (trunc, sext or zext, inttoptr,
+ptrtoint), one too many dropped, one missing 0, the result converted back. A wasm call of another signature traps, and
+LLVM's own adapters only bitcast. Functions declared as data, for their addresses, become function declarations.
 
     python fixcalls.py TARGET.ll,... SOURCE.ll...
 """
@@ -12,14 +12,17 @@ from pathlib import Path
 DEFINE = re.compile(r"^define ((?:[a-z_]+ )*?)((?:signext |zeroext )?)(\S+) @([\w.$]+)\(([^)]*)\)", re.M)
 DECLARE = re.compile(r"^declare .*?@([\w.$]+)\(.*$", re.M)
 EXTERNAL = re.compile(r"^@([\w.$]+) = external (?:[a-z_]+ )*global .*$", re.M)
-INDIRECT = re.compile(r"^(\s*)(?:(%[\w.]+) = )?((?:tail |musttail |notail )?call )((?:[a-z_]+ )*?)(\S+) (%[\w.]+)\((.*)\)(.*)$")
+# A call's indentation, result, keyword, attributes, type, callee (a value for an indirect one), arguments and the rest
+CALL_HEAD = r"^(\s*)(?:(%[\w.]+) = )?((?:tail |musttail |notail )?call )((?:[a-z_]+ )*?)(\S+) "
+INDIRECT = re.compile(CALL_HEAD + r"(%[\w.]+)\((.*)\)(.*)$")
 SPLIT_WORD = re.compile(r"\.word ([A-Za-z_][\w]*)")
 NARROW = {"i1": "i32", "i8": "i32", "i16": "i32"}
-CALL = re.compile(r"^(\s*)(?:(%[\w.]+) = )?((?:tail |musttail |notail )?call )((?:[a-z_]+ )*?)(\S+) @([\w.$]+)\((.*)\)(.*)$")
+CALL = re.compile(CALL_HEAD + r"@([\w.$]+)\((.*)\)(.*)$")
 # CALL's group holding the callee's name
 CALL_CALLEE = 6
 INTEGER_BITS = {"i1": 1, "i8": 8, "i16": 16, "i32": 32, "i64": 64}
-ATTRIBUTES = re.compile(r"\b(noundef|signext|zeroext|nonnull|noalias|nocapture|readonly|writeonly|dereferenceable\(\d+\)|align \d+)\b ?")
+ATTRIBUTES = re.compile(r"\b(noundef|signext|zeroext|nonnull|noalias|nocapture|readonly|writeonly"
+                        r"|dereferenceable\(\d+\)|align \d+)\b ?")
 
 
 def split_args(text):
@@ -126,7 +129,8 @@ def dispatcher(name, ret, arg_types, targets, defined):
     counter = 0
     for index, target in enumerate(sorted(targets)):
         t_ret, t_ext, t_params = defined[target]
-        lines += [f"  %is{index} = icmp eq ptr %fn, @{target}", f"  br i1 %is{index}, label %call{index}, label %next{index}",
+        lines += [f"  %is{index} = icmp eq ptr %fn, @{target}",
+                  f"  br i1 %is{index}, label %call{index}, label %next{index}",
                   f"call{index}:"]
         args = []
         for i, (p_type, p_ext) in enumerate(t_params):

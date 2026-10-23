@@ -1,5 +1,5 @@
-/* Spike: runs wasm2c's crash2 module natively, with the part of WASI preview 1 the program uses: its arguments and
- * environment, files under one preopened root, the clocks, exit. The rest answers ENOSYS */
+/* The part of WASI preview 1 the module uses (src/host64): its arguments and environment, files under one preopened
+ * root, the clocks, exit. The rest answers ENOSYS */
 #include <errno.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -10,9 +10,7 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "crash2.h"
-#include "wasm-rt-exceptions.h"
-#include "wasm-rt-impl.h"
+#include "host64.h"
 
 #define WASI_ESUCCESS 0
 #define WASI_EBADF 8
@@ -69,8 +67,11 @@
 #define CREATED_FILE_MODE 0644
 #define CREATED_DIRECTORY_MODE 0755
 
+/* wasm2c's names for the module's WASI imports */
+#define WASI(name) w2c_wasi__snapshot__preview1_##name
+typedef struct w2c_wasi__snapshot__preview1 Wasi;
+
 struct w2c_wasi__snapshot__preview1 {
-    w2c_crash2 *module;
     int argc;
     char **argv;
     int host_fd[FDS_MAX];
@@ -79,14 +80,22 @@ struct w2c_wasi__snapshot__preview1 {
 
 extern char **environ;
 
-static uint8_t *mem(struct w2c_wasi__snapshot__preview1 *w) {
-    return w2c_crash2_memory(w->module)->data;
+Wasi g_Wasi;
+
+static uint8_t *mem(Wasi *w) {
+    (void)w;
+    return w2c_crash2_memory(&g_Module)->data;
 }
 
-static void put32(struct w2c_wasi__snapshot__preview1 *w, u32 at, u32 value) { memcpy(mem(w) + at, &value, sizeof value); }
-static void put64(struct w2c_wasi__snapshot__preview1 *w, u32 at, u64 value) { memcpy(mem(w) + at, &value, sizeof value); }
+static void put32(Wasi *w, u32 at, u32 value) {
+    memcpy(mem(w) + at, &value, sizeof value);
+}
 
-static u32 get32(struct w2c_wasi__snapshot__preview1 *w, u32 at) {
+static void put64(Wasi *w, u32 at, u64 value) {
+    memcpy(mem(w) + at, &value, sizeof value);
+}
+
+static u32 get32(Wasi *w, u32 at) {
     u32 v;
 
     memcpy(&v, mem(w) + at, sizeof v);
@@ -124,7 +133,7 @@ static uint8_t filetype(mode_t mode) {
     }
 }
 
-static int host(struct w2c_wasi__snapshot__preview1 *w, u32 fd) {
+static int host(Wasi *w, u32 fd) {
     if (fd >= FDS_MAX) {
         return -1;
     } else {
@@ -133,7 +142,7 @@ static int host(struct w2c_wasi__snapshot__preview1 *w, u32 fd) {
 }
 
 /* The preopened root is the host's root: a module's path "x/y" is "/x/y" */
-static void host_path(struct w2c_wasi__snapshot__preview1 *w, u32 path, u32 length, char *out) {
+static void host_path(Wasi *w, u32 path, u32 length, char *out) {
     u32 copied = length < PATH_NAME_BYTES ? length : PATH_NAME_BYTES;
 
     out[0] = '/';
@@ -141,7 +150,7 @@ static void host_path(struct w2c_wasi__snapshot__preview1 *w, u32 path, u32 leng
     out[1 + copied] = '\0';
 }
 
-u32 w2c_wasi__snapshot__preview1_args_sizes_get(struct w2c_wasi__snapshot__preview1 *w, u32 count, u32 bytes) {
+u32 WASI(args_sizes_get)(Wasi *w, u32 count, u32 bytes) {
     u32 total = 0;
 
     for (int i = 0; i < w->argc; i++) {
@@ -152,7 +161,7 @@ u32 w2c_wasi__snapshot__preview1_args_sizes_get(struct w2c_wasi__snapshot__previ
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_args_get(struct w2c_wasi__snapshot__preview1 *w, u32 argv, u32 buffer) {
+u32 WASI(args_get)(Wasi *w, u32 argv, u32 buffer) {
     for (int i = 0; i < w->argc; i++) {
         size_t n = strlen(w->argv[i]) + 1;
 
@@ -163,7 +172,7 @@ u32 w2c_wasi__snapshot__preview1_args_get(struct w2c_wasi__snapshot__preview1 *w
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_environ_sizes_get(struct w2c_wasi__snapshot__preview1 *w, u32 count, u32 bytes) {
+u32 WASI(environ_sizes_get)(Wasi *w, u32 count, u32 bytes) {
     u32 n = 0;
     u32 total = 0;
 
@@ -176,7 +185,7 @@ u32 w2c_wasi__snapshot__preview1_environ_sizes_get(struct w2c_wasi__snapshot__pr
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_environ_get(struct w2c_wasi__snapshot__preview1 *w, u32 list, u32 buffer) {
+u32 WASI(environ_get)(Wasi *w, u32 list, u32 buffer) {
     u32 i = 0;
 
     for (char **e = environ; *e != NULL; e++, i++) {
@@ -189,13 +198,13 @@ u32 w2c_wasi__snapshot__preview1_environ_get(struct w2c_wasi__snapshot__preview1
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_clock_res_get(struct w2c_wasi__snapshot__preview1 *w, u32 id, u32 out) {
+u32 WASI(clock_res_get)(Wasi *w, u32 id, u32 out) {
     (void)id;
     put64(w, out, CLOCK_RESOLUTION_NS);
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_clock_time_get(struct w2c_wasi__snapshot__preview1 *w, u32 id, u64 precision, u32 out) {
+u32 WASI(clock_time_get)(Wasi *w, u32 id, u64 precision, u32 out) {
     struct timespec now;
 
     (void)precision;
@@ -204,7 +213,7 @@ u32 w2c_wasi__snapshot__preview1_clock_time_get(struct w2c_wasi__snapshot__previ
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_prestat_get(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 out) {
+u32 WASI(fd_prestat_get)(Wasi *w, u32 fd, u32 out) {
     if (fd != PREOPEN_FD) {
         return WASI_EBADF;
     } else {
@@ -215,7 +224,7 @@ u32 w2c_wasi__snapshot__preview1_fd_prestat_get(struct w2c_wasi__snapshot__previ
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_prestat_dir_name(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 path, u32 length) {
+u32 WASI(fd_prestat_dir_name)(Wasi *w, u32 fd, u32 path, u32 length) {
     if (fd != PREOPEN_FD || length < PREOPEN_NAME_LENGTH) {
         return WASI_EBADF;
     } else {
@@ -225,7 +234,7 @@ u32 w2c_wasi__snapshot__preview1_fd_prestat_dir_name(struct w2c_wasi__snapshot__
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_path_open(struct w2c_wasi__snapshot__preview1 *w, u32 dirfd, u32 dirflags, u32 path,
+u32 WASI(path_open)(Wasi *w, u32 dirfd, u32 dirflags, u32 path,
                                            u32 length, u32 oflags, u64 rights, u64 inheriting, u32 fdflags, u32 out) {
     char name[PATH_BYTES];
     int flags = 0;
@@ -295,7 +304,7 @@ u32 w2c_wasi__snapshot__preview1_path_open(struct w2c_wasi__snapshot__preview1 *
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_close(struct w2c_wasi__snapshot__preview1 *w, u32 fd) {
+u32 WASI(fd_close)(Wasi *w, u32 fd) {
     int h = host(w, fd);
 
     if (h < 0) {
@@ -309,7 +318,7 @@ u32 w2c_wasi__snapshot__preview1_fd_close(struct w2c_wasi__snapshot__preview1 *w
     return WASI_ESUCCESS;
 }
 
-static u32 transfer(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u32 count, u32 out, int writing,
+static u32 transfer(Wasi *w, u32 fd, u32 iovs, u32 count, u32 out, int writing,
                     int64_t offset) {
     int h = host(w, fd);
     u32 total = 0;
@@ -348,20 +357,20 @@ static u32 transfer(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u3
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_read(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u32 count, u32 out) {
+u32 WASI(fd_read)(Wasi *w, u32 fd, u32 iovs, u32 count, u32 out) {
     return transfer(w, fd, iovs, count, out, 0, -1);
 }
-u32 w2c_wasi__snapshot__preview1_fd_write(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u32 count, u32 out) {
+u32 WASI(fd_write)(Wasi *w, u32 fd, u32 iovs, u32 count, u32 out) {
     return transfer(w, fd, iovs, count, out, 1, -1);
 }
-u32 w2c_wasi__snapshot__preview1_fd_pread(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u32 count, u64 offset, u32 out) {
+u32 WASI(fd_pread)(Wasi *w, u32 fd, u32 iovs, u32 count, u64 offset, u32 out) {
     return transfer(w, fd, iovs, count, out, 0, (int64_t)offset);
 }
-u32 w2c_wasi__snapshot__preview1_fd_pwrite(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 iovs, u32 count, u64 offset, u32 out) {
+u32 WASI(fd_pwrite)(Wasi *w, u32 fd, u32 iovs, u32 count, u64 offset, u32 out) {
     return transfer(w, fd, iovs, count, out, 1, (int64_t)offset);
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_seek(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u64 offset, u32 whence, u32 out) {
+u32 WASI(fd_seek)(Wasi *w, u32 fd, u64 offset, u32 whence, u32 out) {
     int h = host(w, fd);
     off_t at;
 
@@ -380,11 +389,11 @@ u32 w2c_wasi__snapshot__preview1_fd_seek(struct w2c_wasi__snapshot__preview1 *w,
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_tell(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 out) {
-    return w2c_wasi__snapshot__preview1_fd_seek(w, fd, 0, WASI_WHENCE_CUR, out);
+u32 WASI(fd_tell)(Wasi *w, u32 fd, u32 out) {
+    return WASI(fd_seek)(w, fd, 0, WASI_WHENCE_CUR, out);
 }
 
-static void filestat(struct w2c_wasi__snapshot__preview1 *w, const struct stat *s, u32 out) {
+static void filestat(Wasi *w, const struct stat *s, u32 out) {
     memset(mem(w) + out, 0, FILESTAT_BYTES);
     put64(w, out, (u64)s->st_dev);
     put64(w, out + FILESTAT_INO_OFFSET, (u64)s->st_ino);
@@ -393,7 +402,7 @@ static void filestat(struct w2c_wasi__snapshot__preview1 *w, const struct stat *
     put64(w, out + FILESTAT_SIZE_OFFSET, (u64)s->st_size);
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_fdstat_get(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 out) {
+u32 WASI(fd_fdstat_get)(Wasi *w, u32 fd, u32 out) {
     int h = host(w, fd);
     struct stat s;
 
@@ -414,7 +423,7 @@ u32 w2c_wasi__snapshot__preview1_fd_fdstat_get(struct w2c_wasi__snapshot__previe
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_fd_filestat_get(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 out) {
+u32 WASI(fd_filestat_get)(Wasi *w, u32 fd, u32 out) {
     int h = host(w, fd);
     struct stat s;
 
@@ -432,7 +441,7 @@ u32 w2c_wasi__snapshot__preview1_fd_filestat_get(struct w2c_wasi__snapshot__prev
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_path_filestat_get(struct w2c_wasi__snapshot__preview1 *w, u32 dirfd, u32 flags, u32 path, u32 length, u32 out) {
+u32 WASI(path_filestat_get)(Wasi *w, u32 dirfd, u32 flags, u32 path, u32 length, u32 out) {
     char name[PATH_BYTES];
     struct stat s;
 
@@ -452,7 +461,7 @@ u32 w2c_wasi__snapshot__preview1_path_filestat_get(struct w2c_wasi__snapshot__pr
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_path_create_directory(struct w2c_wasi__snapshot__preview1 *w, u32 dirfd, u32 path, u32 length) {
+u32 WASI(path_create_directory)(Wasi *w, u32 dirfd, u32 path, u32 length) {
     char name[PATH_BYTES];
 
     if (dirfd != PREOPEN_FD) {
@@ -464,32 +473,52 @@ u32 w2c_wasi__snapshot__preview1_path_create_directory(struct w2c_wasi__snapshot
     return mkdir(name, CREATED_DIRECTORY_MODE) == 0 ? WASI_ESUCCESS : errno_to_wasi(errno);
 }
 
-void w2c_wasi__snapshot__preview1_proc_exit(struct w2c_wasi__snapshot__preview1 *w, u32 code) {
+void WASI(proc_exit)(Wasi *w, u32 code) {
     (void)w;
     exit((int)code);
 }
 
-u32 w2c_wasi__snapshot__preview1_random_get(struct w2c_wasi__snapshot__preview1 *w, u32 buffer, u32 length) {
+u32 WASI(random_get)(Wasi *w, u32 buffer, u32 length) {
     for (u32 i = 0; i < length; i++) {
         mem(w)[buffer + i] = (uint8_t)rand();
     }
     return WASI_ESUCCESS;
 }
 
-u32 w2c_wasi__snapshot__preview1_sched_yield(struct w2c_wasi__snapshot__preview1 *w) { (void)w; return WASI_ESUCCESS; }
-u32 w2c_wasi__snapshot__preview1_poll_oneoff(struct w2c_wasi__snapshot__preview1 *w, u32 a, u32 b, u32 c, u32 out) {
+u32 WASI(sched_yield)(Wasi *w) {
+    (void)w;
+    return WASI_ESUCCESS;
+}
+u32 WASI(poll_oneoff)(Wasi *w, u32 a, u32 b, u32 c, u32 out) {
     (void)a;
     (void)b;
     (void)c;
     put32(w, out, 0);
     return WASI_ESUCCESS;
 }
-u32 w2c_wasi__snapshot__preview1_fd_sync(struct w2c_wasi__snapshot__preview1 *w, u32 fd) { (void)w; (void)fd; return WASI_ESUCCESS; }
-u32 w2c_wasi__snapshot__preview1_fd_datasync(struct w2c_wasi__snapshot__preview1 *w, u32 fd) { (void)w; (void)fd; return WASI_ESUCCESS; }
-u32 w2c_wasi__snapshot__preview1_fd_fdstat_set_flags(struct w2c_wasi__snapshot__preview1 *w, u32 fd, u32 f) { (void)w; (void)fd; (void)f; return WASI_ESUCCESS; }
+u32 WASI(fd_sync)(Wasi *w, u32 fd) {
+    (void)w;
+    (void)fd;
+    return WASI_ESUCCESS;
+}
 
-/* Not used headless */
-#define NOSYS(name, ...) u32 w2c_wasi__snapshot__preview1_##name(struct w2c_wasi__snapshot__preview1 *w, __VA_ARGS__) { (void)w; return WASI_ENOSYS; }
+u32 WASI(fd_datasync)(Wasi *w, u32 fd) {
+    (void)w;
+    (void)fd;
+    return WASI_ESUCCESS;
+}
+
+u32 WASI(fd_fdstat_set_flags)(Wasi *w, u32 fd, u32 flags) {
+    (void)w;
+    (void)fd;
+    (void)flags;
+    return WASI_ESUCCESS;
+}
+
+/* Not used by the program: answered ENOSYS, their arguments unread */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#define NOSYS(name, ...) u32 WASI(name)(Wasi *w, __VA_ARGS__) { (void)w; return WASI_ENOSYS; }
 NOSYS(fd_advise, u32 a, u64 b, u64 c, u32 d)
 NOSYS(fd_allocate, u32 a, u64 b, u64 c)
 NOSYS(fd_fdstat_set_rights, u32 a, u64 b, u64 c)
@@ -508,32 +537,16 @@ NOSYS(sock_accept, u32 a, u32 b, u32 c)
 NOSYS(sock_recv, u32 a, u32 b, u32 c, u32 d, u32 e, u32 f)
 NOSYS(sock_send, u32 a, u32 b, u32 c, u32 d, u32 e)
 NOSYS(sock_shutdown, u32 a, u32 b)
+#pragma GCC diagnostic pop
 
-int main(int argc, char **argv) {
-    static w2c_crash2 module;
-    static struct w2c_wasi__snapshot__preview1 wasi;
-    wasm_rt_trap_t trap;
-
-    wasi.module = &module;
-    wasi.argc = argc;
-    wasi.argv = argv;
+void Wasi_Start(int argc, char **argv) {
+    g_Wasi.argc = argc;
+    g_Wasi.argv = argv;
     for (int i = 0; i < FDS_MAX; i++) {
-        wasi.host_fd[i] = -1;
+        g_Wasi.host_fd[i] = -1;
     }
-    wasi.host_fd[STDIN_FILENO] = STDIN_FILENO;
-    wasi.host_fd[STDOUT_FILENO] = STDOUT_FILENO;
-    wasi.host_fd[STDERR_FILENO] = STDERR_FILENO;
-    wasi.host_fd[PREOPEN_FD] = open("/", O_RDONLY | O_DIRECTORY);
-    wasm_rt_init();
-    wasm2c_crash2_instantiate(&module, &wasi);
-    trap = wasm_rt_impl_try();
-    if (trap == WASM_RT_TRAP_NONE) {
-        w2c_crash2_0x5Fstart(&module);
-    } else {
-        fprintf(stderr, "spike: trap %s\n", wasm_rt_strerror(trap));
-        return EXIT_FAILURE;
-    }
-    wasm2c_crash2_free(&module);
-    wasm_rt_free();
-    return 0;
+    g_Wasi.host_fd[STDIN_FILENO] = STDIN_FILENO;
+    g_Wasi.host_fd[STDOUT_FILENO] = STDOUT_FILENO;
+    g_Wasi.host_fd[STDERR_FILENO] = STDERR_FILENO;
+    g_Wasi.host_fd[PREOPEN_FD] = open("/", O_RDONLY | O_DIRECTORY);
 }

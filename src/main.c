@@ -86,8 +86,8 @@ static int protect(void *start, unsigned int bytes) {
 #endif
 
 #ifdef __wasi__
-/* Spike: the module's memory holds the game's from 0x80070000 (tools/wasm-spike/build.sh), with no linker script and no
- * pages to protect; its layout is checked from the link's map */
+/* The 64-bit build's module: its memory holds the game's from 0x80070000 (tools/wasm/module.py), with no linker script
+ * and no pages to protect; its layout is checked from the link's map */
 static void check_window(void) {
 }
 #else
