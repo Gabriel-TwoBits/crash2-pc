@@ -110,6 +110,7 @@ void Host_SaveSettings(void) {
     char path[PATH_BYTES];
     FILE *file;
     int index;
+    int written = 1;
 
     if (!settings_path(path, sizeof(path))) {
         return;
@@ -121,8 +122,13 @@ void Host_SaveSettings(void) {
         return;
     } else {
         for (index = 0; index < SETTING_COUNT; index++) {
-            fprintf(file, "%s=%d\n", g_Settings[index].key, g_Settings[index].value);
+            written = written && fprintf(file, "%s=%d\n", g_Settings[index].key, g_Settings[index].value) >= 0;
         }
-        fclose(file);
+        written = fclose(file) == 0 && written;
+    }
+    if (!written) {
+        Host_Log("can't save the settings in %s", path);
+    } else {
+        /* Saved */
     }
 }
