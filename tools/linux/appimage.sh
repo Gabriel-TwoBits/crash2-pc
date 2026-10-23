@@ -35,6 +35,18 @@ for library in $LOADED; do
 done
 # The program's and SDL3's debugging symbols left out, their symbol tables kept
 strip --strip-debug "$APPDIR/usr/bin/crash2" "$LIBRARIES/libSDL3.so.0"
+# The licences: the port's and SwanStation's GPL-3.0, SDL's zlib licence, and the 64-bit build's wasm2c runtime and C
+# library (cmake/host64.cmake)
+DOCUMENTS=$APPDIR/usr/share/doc/crash2-pc
+mkdir -p "$DOCUMENTS"
+cp LICENSE "$DOCUMENTS/LICENSE.txt"
+cp third_party/swanstation/LICENSE "$DOCUMENTS/LICENSE-SwanStation.txt"
+cp "$BUILD/_deps/sdl3-src/LICENSE.txt" "$DOCUMENTS/LICENSE-SDL3.txt"
+if [ -d "$BUILD/licenses" ]; then
+    cp "$BUILD"/licenses/LICENSE-*.txt "$DOCUMENTS"
+else
+    : # The 32-bit build carries no other library of its own
+fi
 
 # Every library those load, the C library's loader among them, by the names they're asked for
 for object in "$APPDIR/usr/bin/crash2" "$LIBRARIES"/*; do

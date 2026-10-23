@@ -36,6 +36,28 @@ FetchContent_Declare(wabt
 FetchContent_MakeAvailable(wasi_sdk wabt)
 set(WASM2C_RUNTIME ${wabt_SOURCE_DIR}/share/wabt/wasm2c)
 
+# The licences of what the program carries beyond the port's and SDL's, which the packages carry (tools/*/build.sh,
+# tools/linux/appimage.sh): wasm2c's runtime, WABT's Apache-2.0, and wasi-sdk's C library, wasi-libc at the commit
+# wasi-sdk 34 builds, with the works it derives from. Its binary releases hold none of them
+set(LICENSES ${CMAKE_BINARY_DIR}/licenses)
+set(WASI_LIBC_SOURCE https://raw.githubusercontent.com/WebAssembly/wasi-libc/2e6fb9d8ee0cdf9e431fbcabe8af3115de000a13)
+file(DOWNLOAD https://raw.githubusercontent.com/WebAssembly/wabt/1.0.42/LICENSE ${LICENSES}/LICENSE-wasm2c.txt
+    EXPECTED_HASH SHA256=cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30)
+set(WASI_LIBC_LICENSE_PARTS
+    LICENSE 2711a8b5a5cdfef0e639f96c1aca12ae23d7d64a02d0507f1bdf14d2b27bbc3a
+    LICENSE-MIT 23f18e03dc49df91622fe2a76176497404e46ced8a715d9d2b67a7446571cca3
+    libc-top-half/musl/COPYRIGHT b870108ec5e7790e9f9919064f1b9421d62d5f9b0e6c230c6adf7ea2da62e97b
+    libc-bottom-half/cloudlibc/LICENSE c8b789cf5a746611e6300a0cc7750dbf92b61912a709d04e639245f7290656d0
+    fts/musl-fts/COPYING 55af87e4017668f54467a3380e7ebbac5e672d8c763bfe95e6fc882a6fdc4046)
+file(WRITE ${LICENSES}/LICENSE-wasi-libc.txt "")
+while(WASI_LIBC_LICENSE_PARTS)
+    list(POP_FRONT WASI_LIBC_LICENSE_PARTS part part_sha256)
+    string(REPLACE "/" "_" part_file ${part})
+    file(DOWNLOAD ${WASI_LIBC_SOURCE}/${part} ${LICENSES}/wasi-libc/${part_file} EXPECTED_HASH SHA256=${part_sha256})
+    file(READ ${LICENSES}/wasi-libc/${part_file} part_text)
+    file(APPEND ${LICENSES}/LICENSE-wasi-libc.txt "==== wasi-libc: ${part} ====\n\n${part_text}\n")
+endwhile()
+
 # The module: every host source but the GPU renderer (native) and the 32-bit build's own
 set(MODULE ${CMAKE_BINARY_DIR}/module)
 set(MODULE_HOST_SOURCES
