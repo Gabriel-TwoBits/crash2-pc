@@ -7,8 +7,9 @@ sound, the CD, the memory card and the pad.
 
 > [!IMPORTANT]
 > **No game data is included.** You need your own copy of the game: the build reads the executable's layout from your
-> disc image, and the program reads the executable's data and the game's levels from it when it starts. Crash Bandicoot is a trademark of Activision; PlayStation of Sony Interactive
-> Entertainment. This is a fan project, not affiliated with or endorsed by either.
+> disc image, and the program reads the executable's data and the game's levels from it when it starts. Crash
+> Bandicoot is a trademark of Activision; PlayStation of Sony Interactive Entertainment. This is a fan project, not
+> affiliated with or endorsed by either.
 
 ## Status
 
@@ -50,12 +51,34 @@ build/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
 
 What the split and the build make from your executable stays in `decomp/` (ignored there) and `build/`.
 
+### The 64-bit build
+
+The game's C needs 32-bit pointers. On a 64-bit system without a 32-bit toolchain, CMake builds it through
+WebAssembly instead: the game's C and the port's, but the GPU renderer, are compiled for wasm32, whose pointers are 32
+bits, and wasm2c turns that module into C the system's compiler builds natively, with SDL and the GPU renderer around
+it (docs/ROADMAP.md, milestone 16). It plays the same frames as the 32-bit build, takes the system's own 64-bit Vulkan
+for the GPU renderer, and needs no 32-bit library at all. CMake fetches wasi-sdk 34 and WABT 1.0.42, pinned by
+SHA-256, for Linux (x86-64 or ARM), macOS on Apple silicon and Windows on x86-64:
+
+```sh
+sudo apt install gcc g++ cmake ninja-build python3 glslang-tools libx11-dev libxext-dev libxcursor-dev libxi-dev \
+    libxfixes-dev libxrandr-dev libxss-dev libxkbcommon-dev libwayland-dev libegl-dev libpulse-dev libasound2-dev \
+    libudev-dev
+cmake -S . -B build64 -G Ninja
+cmake --build build64
+build64/crash2 "path/to/Crash Bandicoot 2 - Cortex Strikes Back (USA).cue"
+```
+
+So far built and checked on Linux x86-64 only. On a Mac the GPU renderer's shaders are SPIR-V, which Metal doesn't
+take: the game shows the PlayStation's picture there until they are translated.
+
 ### Linux's AppImage
 
 `tools/linux/build.sh` builds the same in a container, with podman or docker, into
 `build-linux/crash2-pc-linux.AppImage`: the 32-bit program with every library it loads, its C library included, so it
 runs on a 64-bit Linux with no 32-bit library installed, X11 or Wayland, PulseAudio or PipeWire. Open it, or run
-`./crash2-pc-linux.AppImage "path/to/the.cue"`.
+`./crash2-pc-linux.AppImage "path/to/the.cue"`. It also builds the 64-bit build the same way into
+`build-linux64/crash2-pc-linux-x86_64.AppImage`, whose GPU renderer takes the system's 64-bit Vulkan.
 
 ### Windows
 
@@ -104,9 +127,10 @@ in `settings.ini` beside the memory card:
 | WARPING | the PlayStation's textures stretched without depth, so they bend on a slanted surface; off, they lie flat |
 | FPS | 30 frames a second as the PlayStation's game runs, or 60: a frame drawn between each two, halfway |
 
-The resolution takes Vulkan from a 32-bit driver: on Linux the i386 Vulkan packages (`libvulkan1:i386` and
-`mesa-vulkan-drivers:i386` on Debian, what Steam installs too); on Windows the graphics card's driver. Without it the
-game shows the PlayStation's picture, and the options leave out the resolution, the steadiness and the perspective.
+The resolution takes Vulkan from the system's driver: the 64-bit build from its 64-bit one; the 32-bit build on Linux
+from the i386 Vulkan packages (`libvulkan1:i386` and `mesa-vulkan-drivers:i386` on Debian, what Steam installs too), on
+Windows from the graphics card's driver. Without it the game shows the PlayStation's picture, and the options leave out
+the resolution, the steadiness and the perspective.
 
 The memory card is `memcard1.mcd` in SDL's preference folder (on Linux under `~/.local/share`, on Windows under
 `%APPDATA%`): a 128 KB card image, the format emulators and card tools use, so a save moves between them.

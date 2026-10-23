@@ -35,6 +35,13 @@ for 32-bit x86: Debian's i386 package conflicts with backports' Mesa. The build 
 otherwise, the game's C always at -O0 (docs/ROADMAP.md, milestone 6, "Speed"); a change that should leave the game as it
 is shows it by the same `game_frames.txt` hashes as before.
 
+The 64-bit build: `cmake -S . -B build64 -G Ninja` with the system's own 64-bit compiler, then `cmake --build build64`;
+`build64/crash2` runs it as `build/crash2` (docs/ROADMAP.md, milestone 16). The module (`tools/wasm/module.py`) holds
+the game's C and the host's but `src/render.c`; `src/host64` and the renderer are native. A change to the host's code
+builds and plays on both: the same `game_frames.txt`, SPU log and card from either on the same run. The module's
+imports are SDL's and the renderer's only (module.py refuses others): a new SDL call in the host's code needs its
+bridge in `src/host64/bridge.c`.
+
 ## Running and testing
 
 - `build/crash2 DISC.cue` runs headless; `tools/check_layout.py` checks the game's data layout after each link.

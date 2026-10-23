@@ -8,7 +8,8 @@ matching"):
 1. **A 32-bit build.** The game overwrites 32-bit slots of the disc's data with pointers (the NSF pages' and entries'
    offsets, the NSD's buckets), and the GOOL entries' native code reads objects at fixed offsets: a 32-bit build keeps
    every layout. A 64-bit one had 736 casts between pointers and integers of another size, and 50 layout checks
-   failing. The cost: no macOS build, which has no 32-bit executables.
+   failing. The cost was no macOS build, which has no 32-bit executables: a 64-bit build now goes through wasm32,
+   whose pointers are 32 bits (milestone 16).
 2. **The game's memory at the PlayStation's RAM, 0x80000000.** First taken as "anywhere, behind macros", revised
    when the host build ran. The game tells a pointer from an error by its sign: its errors are small negative numbers
    (`SUCCESS` is -0xFF, others -0x10 and -0x12), its pointers negative below them as KSEG0 addresses. So `Obj_Init`
@@ -290,15 +291,15 @@ matching"):
     depth is nearest its other vertices'. Taking the later alone, 2.2% of the vertices drawn took another's, and their
     polygons' textures flickered as Crash moved. TRADEOFF: following each value through the game's memory (PGXP) would
     tell them apart for sure. Both are options, off as the PlayStation draws, shown with the GPU renderer.
-    - **Kept within the GTE's limits:** a projection was first kept only when its position came within 1.5 pixels of
-      the GTE's, but the GTE floors IR1-2 before it multiplies (up to H / SZ3 pixels more) and its division errs more
-      far from the screen's centre, so near vertices (H 288 and z some 400 on Snow Go's path, 1.7 pixels) and those
-      off the screen were dropped, their polygons drawn as written beside steady neighbours: on the recorded Snow Go
-      run at 8×, 63,481 of 3.2 million polygons drawn had some vertices and not others, switching between the two as
-      their vertices crossed the tolerance, and the pause screen's crystal and gem had black wedges and broken facets. A projection is now
-      kept unless the GTE saturated IR1-2, SZ3 or the position or its division overflowed: 4,959 left (the positions
-      past the screen's limits among them), the models as the software picture draws them. The slots' probes full (180 times on
-      that run), the frame already drawn gives up its projection rather than the frame being built.
+    - **Kept within the GTE's limits:** a projection was first kept only when its position came within 1.5 pixels of the
+      GTE's, but the GTE floors IR1-2 before it multiplies (up to H / SZ3 pixels more) and its division errs more far
+      from the screen's centre, so near vertices (H 288 and z some 400 on Snow Go's path, 1.7 pixels) and those off the
+      screen were dropped, their polygons drawn as written beside steady neighbours: on the recorded Snow Go run at 8×,
+      63,481 of 3.2 million polygons drawn had some vertices and not others, switching between the two as their vertices
+      crossed the tolerance, and the pause screen's crystal and gem had black wedges and broken facets. A projection is
+      now kept unless the GTE saturated IR1-2, SZ3 or the position or its division overflowed: 4,959 left (the positions
+      past the screen's limits among them), the models as the software picture draws them. The slots' probes full (180
+      times on that run), the frame already drawn gives up its projection rather than the frame being built.
 12. **Widescreen (done).** The shape's third value, 16:9: decomp's GTE model lets a host narrow each projection's
     horizontal offset from the screen's centre (`GTE_HORIZONTAL`, crash2-decomp f7eb8a3), which the port does by 3/4,
     and the picture is shown at 16:9, so a 4:3 picture's worth of the world takes three quarters of the width and the
@@ -345,51 +346,58 @@ matching"):
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
     words where `func_80024658` writes 8, the retail frame's spare words under them, the host's frame the player's
-    position (crash2-decomp 5a565c4). Paths where the retail code reads what its callers left (a callee-saved
-    register, a stack slot), which equivalent C has no value for, call decomp's `CALLER_LEFT`, which the port logs once
-    per function (crash2-decomp 8e80c4a): of the six such functions, only `func_8002DFA8` ran on the demo, the card's
-    and the Snow Go run, and on every call, its first row comparing with the `$s1` `func_8002E280` leaves, its search's
-    last `ny`, now passed to it on the host (`PASSED_ON`, crash2-decomp 30ced94); then none on those runs nor on
-    run_game's new-game and turtle-woods schedules played on the port. The same, found by reading: four callers gave `Ent_GetProperty`'s interpolated
-    row a word where the retail frames hold two and the row takes up to 8 bytes; in `func_800224A0` (the camera's pull
-    on Z, where its path has property 0x252) the host's frame put `new_var` on the row's third value, so `scale` was
-    always the second's low half (crash2-decomp f375744). The demo's, the card's and the Snow Go run's frames, sound
-    and card are the same with it: none of them reaches the property. The decompilation's PCSX-Redux runs don't follow such a recording (the
-    PlayStation's disc reads in real time move its game frames from the opening's screens on). Some textures
-    flickered, at 30 frames a second and 4:3 too, at 8 times the resolution with WOBBLE and WARPING off: polygons
-    falling back from the steady ones as their vertices crossed the 1.5 pixels' tolerance (milestone 11, "Kept within
-    the GTE's limits"); whether that was all of it is for the player's eye.
-16. **64-bit through wasm (a spike, branch `wasm-spike`).** The game's C needs 32-bit pointers (decision 1), which macOS
-    and a 64-bit system's libraries no longer give; wasm32 keeps them, and wasm2c turns a module into C any 64-bit
-    system compiles. `tools/wasm-spike/build.sh` builds the headless program that way: the game's C and the host's,
-    the software picture, the SPU and the interpreter, compiled by wasi-sdk 34's clang for wasm32, linked by wasm-ld,
-    turned into C by WABT 1.0.42's wasm2c and compiled by GCC with a runner holding the part of WASI the program
-    uses. On the demo's 6,000 game frames, the card's run and the Snow Go run, `wbuild/crash2-native` (x86-64) writes
-    the same `game_frames.txt`, SPU log and card as the 32-bit build, and some 10% sooner (9.4 s for the demo, 10.7 s).
+    position (crash2-decomp 5a565c4). Paths where the retail code reads what its callers left (a callee-saved register,
+    a stack slot), which equivalent C has no value for, call decomp's `CALLER_LEFT`, which the port logs once per
+    function (crash2-decomp 8e80c4a): of the six such functions, only `func_8002DFA8` ran on the demo, the card's and
+    the Snow Go run, and on every call, its first row comparing with the `$s1` `func_8002E280` leaves, its search's last
+    `ny`, now passed to it on the host (`PASSED_ON`, crash2-decomp 30ced94); then none on those runs nor on run_game's
+    new-game and turtle-woods schedules played on the port. The same, found by reading: four callers gave
+    `Ent_GetProperty`'s interpolated row a word where the retail frames hold two and the row takes up to 8 bytes; in
+    `func_800224A0` (the camera's pull on Z, where its path has property 0x252) the host's frame put `new_var` on the
+    row's third value, so `scale` was always the second's low half (crash2-decomp f375744). The demo's, the card's and
+    the Snow Go run's frames, sound and card are the same with it: none of them reaches the property. The
+    decompilation's PCSX-Redux runs don't follow such a recording (the PlayStation's disc reads in real time move its
+    game frames from the opening's screens on). Some textures flickered, at 30 frames a second and 4:3 too, at 8 times
+    the resolution with WOBBLE and WARPING off: polygons falling back from the steady ones as their vertices crossed the
+    1.5 pixels' tolerance (milestone 11, "Kept within the GTE's limits"); whether that was all of it is for the player's
+    eye.
+16. **64-bit through wasm (done on Linux).** The game's C needs 32-bit pointers (decision 1), which macOS and a 64-bit
+    system's libraries no longer give: wasm32 keeps them, and wasm2c turns a wasm module into C any 64-bit system
+    compiles. On a 64-bit target CMake builds that way (`cmake/host64.cmake`): `tools/wasm/module.py` compiles the
+    game's C and the host's, all but the GPU renderer, with wasi-sdk 34's clang for wasm32, links them at the game's
+    addresses and turns the module into C with WABT 1.0.42's wasm2c (both fetched, pinned by SHA-256, for Linux x86-64
+    and ARM, macOS on Apple silicon and Windows x86-64); the program compiles it with `src/host64` (WASI's files and
+    clocks, SDL for the module, `main`) and the GPU renderer, `src/render.c`, natively on 64-bit SDL3. On Linux x86-64
+    the demo's 6,000 game frames, the card's run and the Snow Go run write the same `game_frames.txt`, SPU log and card
+    as the 32-bit build, the GPU renderer's pictures at 8× are the same, and so are a run at 60 frames a second and
+    16:9 and windowed runs (software and GPU) on Xvfb; some 10% sooner (9.3 s for the demo, 10.7 s).
+    `tools/linux/build.sh` also makes `crash2-pc-linux-x86_64.AppImage`, whose GPU renderer takes the system's 64-bit
+    Vulkan.
     - **The data's layout:** wasm-ld has no linker script. The split's data and bss are one IR global each
       (`wasm_data.py`), every value at its retail offset and every label an alias into it, the numbers zeros that
       `src/retail_data.c` fills from the disc; between them the game's files' variables, each in a data section of its
-      own and 4-aligned in the IR (`align4.py`), tentative definitions left to the split's bss (`uncommon.py`, wasm
-      has no common symbols). All 60 variables the C defines sit at their retail addresses plus one offset. The game's
-      memory starts at 0x80070000: above 0x80000000 for its pointers' sign, above the retail data's addresses, which
-      `mips.c` maps to the port's copy.
-    - **Calls:** a wasm call of another signature than its callee's traps. The game's C has 133 direct calls whose
-      declaration differs from the definition (K&R declarations, `void` defined, `int` read, an argument too many,
-      `RotTrans`'s fourth) and 41 indirect ones through pointers to functions of other signatures (`D_8005B1E0`'s
+      own and 4-aligned in the IR (`align4.py`), tentative definitions left to the split's bss (`uncommon.py`, wasm has
+      no common symbols). `module.py` checks each variable at its retail address plus one offset from the link's map.
+      The game's memory starts at 0x80070000: above 0x80000000 for its pointers' sign, above the retail data's
+      addresses, which `mips.c` maps to the port's copy (below them, the port's own data was taken for the retail's,
+      and libsnd's voices written 0xB008 bytes away).
+    - **Calls:** a wasm call of another signature than its callee's traps. The game's C has 131 direct calls whose
+      arguments or result differ from the definition's (`RotTrans`'s fourth argument, `func_8002CA1C`'s `$a0`, a
+      `void` read as `int`...) and 41 indirect ones through pointers to functions of other signatures (`D_8005B1E0`'s
       handlers, called as `void (*)(void)`). `fixcalls.py` gives each direct call its callee's signature, converting
       its arguments and result as a prototype would, and routes each indirect one through a dispatcher of its
-      signature, which calls the 192 functions whose address is taken directly when the pointer is theirs.
-    - **The C as clang takes it** (`prepare-game.sh`, on copies in `wbuild/`): 17 functions called before their
-      declaration, declared first; `func_80051328`, declared `void` where its value is read, `int`; `func_80023D7C`,
-      whose retail code returns `Ent_GetPropertyValue`'s value that its callers read through a cast, returning it (on
-      x86 the leftover `eax` held it: in wasm the projection's distance was 0 and nothing was drawn). Functions the C
-      declares as data for their addresses (`extern u8 func_8003DD0C[]`) are declared as functions in the IR. These
-      belong in the decompilation: its prototypes (its ROADMAP's shared header) and the equivalent C of
-      `func_80023D7C`.
-    - **The host:** a module's function pointer is its table index, so `host_text.h`'s test of a word holding one of
-      the port's functions (`mips.c`'s `retail_word`) takes a small number; no page protections (`main.c`,
-      `retail_data.c`); no low RAM handler (a module's address 0 is memory); SDL, the GPU renderer and the sampler
-      stubbed (`stubs.c`).
-    - **Left for a 64-bit build:** the window, sound and pad on SDL in the native program around the module, the GPU
-      renderer reading the module's memory, the build in CMake, macOS (Metal for SDL_GPU's shaders) and Windows, and
-      the decompilation's fixes above.
+      signature, which calls the 192 functions whose address is taken directly when the pointer is theirs. The
+      decompilation's own fixes came first (crash2-decomp e068099, 72ac35d, a6ae5e6): `func_80023D7C`'s value, which
+      its callers read and x86's leftover `eax` happened to hold (in wasm the projection's distance was 0 and nothing
+      was drawn), 17 functions called before their declaration, and functions declared as data for their addresses.
+    - **The boundary:** the module imports SDL's functions it calls (39) and the GPU renderer's (13), which
+      `src/host64/bridge.c` gives on the module's addresses: SDL's objects are small blocks of the module's memory
+      (a texture's holds the width and height `video.c` reads), the events copied as their 128 bytes, a file dialog's
+      answer handed to the module on its own thread. The renderer reads the settings, the VRAM, the display area and
+      the steady polygons' projections through the module's exports (`Host_Setting`, `Host_Vram`, ...), which the
+      32-bit build has as plain functions. A module's function pointer is its table index, so `host_text.h`'s test of
+      a word holding one of the port's functions (`mips.c`'s `retail_word`) takes a small number; the module has no
+      page protections and no low RAM handler (its address 0 is memory).
+    - **Left:** a Mac to build and check it on, and the GPU renderer's shaders in Metal's language there (SPIR-V only
+      so far: on a Mac the game shows the PlayStation's picture); Windows on x86-64 through this build (`wasi.c`'s files
+      are POSIX's), where the 32-bit build plays already.
