@@ -26,8 +26,16 @@
 #define OFFSET_ONE 65536.0
 #define HALF_MASK 0xFFFF
 #define HALF_SHIFT 16
-/* A position further than this from the GTE's own is one it saturated or divided otherwise: not kept */
-#define FRACTION_TOLERANCE 1.5
+/* The GTE's limits (decomp's include/gte.h): IR1-3, SZ3 and the screen position saturate, and H / SZ3 overflows from
+ * H >= 2 * SZ3. Within them the GTE's position is the view's but for its floorings and its division's error (a pixel or
+ * two on the screen, more far off it); past one it is another, drawn as the GTE put it */
+#define VIEW_SHIFT 12
+#define IR_MIN (-0x8000)
+#define IR_MAX 0x7FFF
+#define SZ_MAX 0xFFFF
+#define DIVIDE_LIMIT 2
+#define SCREEN_MIN (-0x400)
+#define SCREEN_MAX 0x3FF
 /* The wide view's narrowing: a 4:3 picture's width in a 16:9 one's */
 #define WIDE_NUMERATOR 3
 #define WIDE_DENOMINATOR 4
@@ -75,6 +83,24 @@ static int recent(const Slot *slot) {
     return slot->generation + 1 >= s_Generation;
 }
 
+static int within_limits(uint32_t sxy, const int64_t *view, uint32_t h) {
+    int64_t ir1 = view[0] >> VIEW_SHIFT;
+    int64_t ir2 = view[1] >> VIEW_SHIFT;
+    int64_t sz3 = view[2] >> VIEW_SHIFT;
+    int16_t sx = (int16_t)(sxy & HALF_MASK);
+    int16_t sy = (int16_t)(sxy >> HALF_SHIFT);
+
+    if (ir1 < IR_MIN || ir1 > IR_MAX || ir2 < IR_MIN || ir2 > IR_MAX) {
+        return 0;
+    } else if (sz3 <= 0 || sz3 > SZ_MAX || (int64_t)h >= DIVIDE_LIMIT * sz3) {
+        return 0;
+    } else if (sx <= SCREEN_MIN || sx >= SCREEN_MAX || sy <= SCREEN_MIN || sy >= SCREEN_MAX) {
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
 void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t ofx, int32_t ofy) {
     double z = (double)view[2] / VIEW_ONE;
     double x, y, dx, dy;
@@ -84,7 +110,7 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
     int probe;
     int index;
 
-    if (z <= 0.0) {
+    if (!within_limits(sxy, view, h)) {
         return;
     } else {
         x = (double)ofx / OFFSET_ONE + narrowed((double)h * ((double)view[0] / VIEW_ONE) / z);
@@ -92,11 +118,7 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
         dx = x - (double)(int16_t)(sxy & HALF_MASK);
         dy = y - (double)(int16_t)(sxy >> HALF_SHIFT);
     }
-    if (dx < -FRACTION_TOLERANCE || dx > FRACTION_TOLERANCE || dy < -FRACTION_TOLERANCE || dy > FRACTION_TOLERANCE) {
-        return;
-    } else {
-        /* Kept: its own slot, else a free or old one along the probes, else the first */
-    }
+    /* Kept: its own slot, else a free or old one along the probes, else the first */
     for (probe = 0; probe < PROBES; probe++) {
         Slot *candidate = &s_Slots[(first + (uint32_t)probe) & SLOT_MASK];
 
