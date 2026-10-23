@@ -266,6 +266,22 @@ void Host_PaceGameFrame(void) {
     }
 }
 
+static int dumped_blank(void) {
+    return s_DumpDirectory != NULL && s_Blanks >= s_DumpFrom && s_Blanks % s_DumpEvery == 0;
+}
+
+/* The software picture is read by a dump, the GPU renderer at the PlayStation's resolution and the SDL_Renderer's
+ * window; the GPU renderer above that resolution and a headless run without it show none of it */
+static int picture_used(void) {
+    if (dumped_blank()) {
+        return 1;
+    } else if (Render_Active()) {
+        return !Render_Drawing();
+    } else {
+        return !s_Headless;
+    }
+}
+
 void Host_PresentFrame(void) {
     int x, y, width, height, enabled;
 
@@ -279,21 +295,21 @@ void Host_PresentFrame(void) {
     Host_ShownArea(&x, &y);
     if (width <= 0 || height <= 0 || width > MAX_DISPLAY_WIDTH || height > MAX_DISPLAY_HEIGHT) {
         return;
+    } else if (!picture_used()) {
+        /* Nothing reads it this blank */
     } else if (!enabled) {
         SDL_memset(s_Pixels, 0, PIXELS_MAX * sizeof(uint32_t));
     } else {
         convert(x, y, width, height);
     }
-    if (s_DumpDirectory == NULL || s_Blanks < s_DumpFrom) {
+    if (!dumped_blank()) {
         /* Not a dumped blank */
-    } else if (s_Blanks % s_DumpEvery == 0 && s_DumpVram) {
+    } else if (s_DumpVram) {
         convert(0, 0, VRAM_WIDTH, VRAM_HEIGHT);
         dump(VRAM_WIDTH, VRAM_HEIGHT);
         convert(x, y, width, height);
-    } else if (s_Blanks % s_DumpEvery == 0) {
-        dump(width, height);
     } else {
-        /* Not a dumped blank */
+        dump(width, height);
     }
     if (Render_Active()) {
         Render_Present(x, y, width, height, enabled, s_Pixels);
