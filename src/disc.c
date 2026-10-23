@@ -20,6 +20,7 @@
 #define CHOSEN 1
 #define CANCELLED 2
 #define FAILED 3
+#define TOO_LONG 4
 
 static char s_Path[PATH_BYTES];
 static SDL_AtomicInt s_Choice;
@@ -28,19 +29,21 @@ static const SDL_DialogFileFilter s_Filters[] = {
     {"Disc images (.cue, .iso)", "cue;iso"},
 };
 
-/* The dialog's answer, maybe from another thread: the first file, none (cancelled), or no list (the dialog failed:
- * its error in s_Path) */
+/* The dialog's answer, maybe from another thread: the first file, none (cancelled), a file whose path s_Path can't
+ * hold, or no list (the dialog failed: its error in s_Path) */
 static void on_chosen(void *userdata, const char *const *files, int filter) {
     (void)userdata;
     (void)filter;
     if (files == NULL) {
         snprintf(s_Path, sizeof(s_Path), "%s", SDL_GetError());
         SDL_SetAtomicInt(&s_Choice, FAILED);
-    } else if (files[0] != NULL && strlen(files[0]) < sizeof(s_Path)) {
+    } else if (files[0] == NULL) {
+        SDL_SetAtomicInt(&s_Choice, CANCELLED);
+    } else if (strlen(files[0]) >= sizeof(s_Path)) {
+        SDL_SetAtomicInt(&s_Choice, TOO_LONG);
+    } else {
         strcpy(s_Path, files[0]);
         SDL_SetAtomicInt(&s_Choice, CHOSEN);
-    } else {
-        SDL_SetAtomicInt(&s_Choice, CANCELLED);
     }
 }
 
@@ -102,6 +105,8 @@ const char *Host_ChooseDisc(int argc, char **argv) {
     }
     if (SDL_GetAtomicInt(&s_Choice) == FAILED) {
         Host_Fatal("no file dialog to choose the disc image (%s): name it as the program's argument", s_Path);
+    } else if (SDL_GetAtomicInt(&s_Choice) == TOO_LONG) {
+        Host_Fatal("the disc image's path is longer than %d bytes: name it as the program's argument", PATH_BYTES - 1);
     } else if (SDL_GetAtomicInt(&s_Choice) == CANCELLED) {
         Host_Log("no disc image chosen");
         exit(EXIT_SUCCESS);
