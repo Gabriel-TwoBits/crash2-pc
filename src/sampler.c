@@ -1,4 +1,4 @@
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__wasi__)
 #include <stdlib.h>
 
 #include "host_log.h"
@@ -6,10 +6,10 @@
 
 #define SAMPLE_VARIABLE "CRASH2_SAMPLE"
 
-/* TRADEOFF: Linux's profiling timer only; on Windows a debugging aid less */
+/* TRADEOFF: Linux's profiling timer only; on Windows and in the 64-bit build's module a debugging aid less */
 void Host_StartSampler(void) {
     if (getenv(SAMPLE_VARIABLE) != NULL) {
-        Host_Log("%s: no sampler on Windows", SAMPLE_VARIABLE);
+        Host_Log("%s: no sampler in this build", SAMPLE_VARIABLE);
     } else {
         /* Not asked for */
     }

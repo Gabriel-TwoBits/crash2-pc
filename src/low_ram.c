@@ -1,3 +1,10 @@
+#ifdef __wasi__
+#include "low_ram.h"
+
+/* The 64-bit build's module: its address 0 is memory as any, which the game's reads near it reach with no fault */
+void Host_InstallLowRam(void) {
+}
+#else
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -319,3 +326,4 @@ void Host_InstallLowRam(void) {
     sigaction(SIGTRAP, &action, NULL);
 }
 #endif
+#endif /* __wasi__ */
