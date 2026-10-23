@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "precise.h"
+#include "render.h"
 #include "settings.h"
 
 /* The wide view (the 16:9 shape) narrows each projection across by 3/4, so a 4:3 picture's worth of the world takes
@@ -83,6 +84,15 @@ static int recent(const Slot *slot) {
     return slot->generation + 1 >= s_Generation;
 }
 
+/* Kept only for the GPU renderer, drawing above the PlayStation's resolution, to draw steady or unwarped */
+static int wanted(void) {
+    if (!Render_Drawing()) {
+        return 0;
+    } else {
+        return g_Settings[SETTING_STEADY].value || g_Settings[SETTING_PERSPECTIVE].value;
+    }
+}
+
 static int within_limits(uint32_t sxy, const int64_t *view, uint32_t h) {
     int64_t ir1 = view[0] >> VIEW_SHIFT;
     int64_t ir2 = view[1] >> VIEW_SHIFT;
@@ -110,7 +120,7 @@ void Host_GteProjected(uint32_t sxy, const int64_t *view, uint32_t h, int32_t of
     int probe;
     int index;
 
-    if (!within_limits(sxy, view, h)) {
+    if (!wanted() || !within_limits(sxy, view, h)) {
         return;
     } else {
         x = (double)ofx / OFFSET_ONE + narrowed((double)h * ((double)view[0] / VIEW_ONE) / z);
