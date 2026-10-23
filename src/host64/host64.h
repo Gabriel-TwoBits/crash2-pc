@@ -16,6 +16,7 @@ extern struct w2c_wasi__snapshot__preview1 g_Wasi;
 /* The module's bytes at its address, NULL for its 0 */
 uint8_t *Module_Bytes(uint32_t address);
 
-void Wasi_Start(int argc, char **argv);
+/* The module's arguments and environment, in UTF-8 */
+void Wasi_Start(int argc, char **argv, char **environment);
 
 #endif /* HOST64_H */

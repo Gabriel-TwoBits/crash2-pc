@@ -2,6 +2,7 @@
  * root, the clocks, exit. The rest answers ENOSYS */
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,6 +10,11 @@
 #include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef _WIN32
+#include <direct.h>
+#include <io.h>
+#include <windows.h>
+#endif
 
 #include "host64.h"
 
@@ -39,8 +45,16 @@
 #define PATH_BYTES 4096
 #define NS_PER_SECOND 1000000000ull
 
-/* A path's bytes once the leading '/' and the terminating NUL are in PATH_BYTES */
-#define PATH_NAME_BYTES (PATH_BYTES - 2)
+#ifdef _WIN32
+/* Windows' paths begin at a drive: the module's "C:/x", under its root "/", is the host's "C:/x" */
+#define ROOT_PREFIX ""
+#else
+/* The preopened root is the host's root: the module's "x/y" is the host's "/x/y" */
+#define ROOT_PREFIX "/"
+#endif
+#define ROOT_PREFIX_BYTES (sizeof ROOT_PREFIX - 1)
+/* A path's bytes once the root's prefix and the terminating NUL are in PATH_BYTES */
+#define PATH_NAME_BYTES (PATH_BYTES - ROOT_PREFIX_BYTES - 1)
 #define WASI_WHENCE_SET 0
 #define WASI_WHENCE_CUR 1
 #define WASI_CLOCK_REALTIME 0
@@ -64,8 +78,20 @@
 #define FDSTAT_BYTES 24
 #define FDSTAT_RIGHTS_BASE_OFFSET 8
 #define FDSTAT_RIGHTS_INHERITING_OFFSET 16
+#ifdef _WIN32
+#define CREATED_FILE_MODE (_S_IREAD | _S_IWRITE)
+/* Windows' C runtime opens no directory: the preopened root is a slot only, which no call reads */
+#define ROOT_SLOT_ONLY INT_MAX
+/* FILETIME counts 100 ns ticks from 1601; WASI's realtime clock counts from 1970 */
+#define FILETIME_UNIX_EPOCH 116444736000000000ull
+#define NS_PER_FILETIME_TICK 100
+#define DWORD_BITS 32
+typedef struct _stat64 HostStat;
+#else
 #define CREATED_FILE_MODE 0644
 #define CREATED_DIRECTORY_MODE 0755
+typedef struct stat HostStat;
+#endif
 
 /* wasm2c's names for the module's WASI imports */
 #define WASI(name) w2c_wasi__snapshot__preview1_##name
@@ -74,11 +100,10 @@ typedef struct w2c_wasi__snapshot__preview1 Wasi;
 struct w2c_wasi__snapshot__preview1 {
     int argc;
     char **argv;
+    char **environment;
     int host_fd[FDS_MAX];
     int is_directory[FDS_MAX];
 };
-
-extern char **environ;
 
 Wasi g_Wasi;
 
@@ -141,14 +166,137 @@ static int host(Wasi *w, u32 fd) {
     }
 }
 
-/* The preopened root is the host's root: a module's path "x/y" is "/x/y" */
+/* A module's path under the preopened root as the host's (ROOT_PREFIX) */
 static void host_path(Wasi *w, u32 path, u32 length, char *out) {
     u32 copied = length < PATH_NAME_BYTES ? length : PATH_NAME_BYTES;
 
-    out[0] = '/';
-    memcpy(out + 1, mem(w) + path, copied);
-    out[1 + copied] = '\0';
+    memcpy(out, ROOT_PREFIX, ROOT_PREFIX_BYTES);
+    memcpy(out + ROOT_PREFIX_BYTES, mem(w) + path, copied);
+    out[ROOT_PREFIX_BYTES + copied] = '\0';
 }
+
+#ifdef _WIN32
+/* Windows takes paths as UTF-16; the module's are UTF-8, as SDL's */
+static int widen(const char *name, wchar_t *wide) {
+    if (MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, name, -1, wide, PATH_BYTES) == 0) {
+        errno = EINVAL;
+        return 0;
+    } else {
+        return 1;
+    }
+}
+
+static int host_open(const char *name, int flags) {
+    wchar_t wide[PATH_BYTES];
+
+    if (!widen(name, wide)) {
+        return -1;
+    } else {
+        /* Binary: the C runtime's default text mode rewrites line ends */
+        return _wopen(wide, flags | O_BINARY, CREATED_FILE_MODE);
+    }
+}
+
+static int host_stat(const char *name, HostStat *s) {
+    wchar_t wide[PATH_BYTES];
+
+    if (!widen(name, wide)) {
+        return -1;
+    } else {
+        return _wstat64(wide, s);
+    }
+}
+
+static int host_fstat(int h, HostStat *s) {
+    return _fstat64(h, s);
+}
+
+static int host_mkdir(const char *name) {
+    wchar_t wide[PATH_BYTES];
+
+    if (!widen(name, wide)) {
+        return -1;
+    } else {
+        return _wmkdir(wide);
+    }
+}
+
+static int64_t host_seek(int h, int64_t offset, int whence) {
+    return _lseeki64(h, offset, whence);
+}
+
+/* The C runtime has no pread or pwrite: the position moved there and put back */
+static ssize_t host_positioned(int h, uint8_t *buffer, u32 length, int64_t offset, int writing) {
+    int64_t was = _lseeki64(h, 0, SEEK_CUR);
+    ssize_t done;
+
+    if (was < 0 || _lseeki64(h, offset, SEEK_SET) < 0) {
+        return -1;
+    } else if (writing) {
+        done = write(h, buffer, length);
+    } else {
+        done = read(h, buffer, length);
+    }
+    _lseeki64(h, was, SEEK_SET);
+    return done;
+}
+
+static u64 host_now(u32 id) {
+    if (id == WASI_CLOCK_REALTIME) {
+        FILETIME now;
+        u64 ticks;
+
+        GetSystemTimePreciseAsFileTime(&now);
+        ticks = ((u64)now.dwHighDateTime << DWORD_BITS) | now.dwLowDateTime;
+        return (ticks - FILETIME_UNIX_EPOCH) * NS_PER_FILETIME_TICK;
+    } else {
+        LARGE_INTEGER count;
+        LARGE_INTEGER frequency;
+        u64 whole;
+
+        QueryPerformanceCounter(&count);
+        QueryPerformanceFrequency(&frequency);
+        whole = (u64)count.QuadPart / (u64)frequency.QuadPart;
+        return whole * NS_PER_SECOND
+            + ((u64)count.QuadPart % (u64)frequency.QuadPart) * NS_PER_SECOND / (u64)frequency.QuadPart;
+    }
+}
+#else
+static int host_open(const char *name, int flags) {
+    return open(name, flags, CREATED_FILE_MODE);
+}
+
+static int host_stat(const char *name, HostStat *s) {
+    return stat(name, s);
+}
+
+static int host_fstat(int h, HostStat *s) {
+    return fstat(h, s);
+}
+
+static int host_mkdir(const char *name) {
+    return mkdir(name, CREATED_DIRECTORY_MODE);
+}
+
+static int64_t host_seek(int h, int64_t offset, int whence) {
+    return lseek(h, (off_t)offset, whence);
+}
+
+static ssize_t host_positioned(int h, uint8_t *buffer, u32 length, int64_t offset, int writing) {
+    if (writing) {
+        return pwrite(h, buffer, length, offset);
+    } else {
+        return pread(h, buffer, length, offset);
+    }
+}
+
+static u64 host_now(u32 id) {
+    struct timespec now;
+
+    clock_gettime(id == WASI_CLOCK_REALTIME ? CLOCK_REALTIME : CLOCK_MONOTONIC, &now);
+    return (u64)now.tv_sec * NS_PER_SECOND + (u64)now.tv_nsec;
+}
+#endif
 
 u32 WASI(args_sizes_get)(Wasi *w, u32 count, u32 bytes) {
     u32 total = 0;
@@ -176,7 +324,7 @@ u32 WASI(environ_sizes_get)(Wasi *w, u32 count, u32 bytes) {
     u32 n = 0;
     u32 total = 0;
 
-    for (char **e = environ; *e != NULL; e++) {
+    for (char **e = w->environment; *e != NULL; e++) {
         n++;
         total += strlen(*e) + 1;
     }
@@ -188,7 +336,7 @@ u32 WASI(environ_sizes_get)(Wasi *w, u32 count, u32 bytes) {
 u32 WASI(environ_get)(Wasi *w, u32 list, u32 buffer) {
     u32 i = 0;
 
-    for (char **e = environ; *e != NULL; e++, i++) {
+    for (char **e = w->environment; *e != NULL; e++, i++) {
         size_t n = strlen(*e) + 1;
 
         memcpy(mem(w) + buffer, *e, n);
@@ -205,11 +353,8 @@ u32 WASI(clock_res_get)(Wasi *w, u32 id, u32 out) {
 }
 
 u32 WASI(clock_time_get)(Wasi *w, u32 id, u64 precision, u32 out) {
-    struct timespec now;
-
     (void)precision;
-    clock_gettime(id == WASI_CLOCK_REALTIME ? CLOCK_REALTIME : CLOCK_MONOTONIC, &now);
-    put64(w, out, (u64)now.tv_sec * NS_PER_SECOND + (u64)now.tv_nsec);
+    put64(w, out, host_now(id));
     return WASI_ESUCCESS;
 }
 
@@ -273,17 +418,26 @@ u32 WASI(path_open)(Wasi *w, u32 dirfd, u32 dirflags, u32 path,
     } else {
         /* Contents kept */
     }
+#ifdef _WIN32
+    if (oflags & OFLAG_DIRECTORY) {
+        /* The C runtime opens no directory; nothing in the module asks it to */
+        return WASI_ENOSYS;
+    } else {
+        /* Any file type */
+    }
+#else
     if (oflags & OFLAG_DIRECTORY) {
         flags |= O_DIRECTORY;
     } else {
         /* Any file type */
     }
+#endif
     if (fdflags & FDFLAG_APPEND) {
         flags |= O_APPEND;
     } else {
         /* Writes at the file position */
     }
-    fd = open(name, flags, CREATED_FILE_MODE);
+    fd = host_open(name, flags);
     if (fd < 0) {
         return errno_to_wasi(errno);
     } else {
@@ -335,12 +489,10 @@ static u32 transfer(Wasi *w, u32 fd, u32 iovs, u32 count, u32 out, int writing,
 
         if (writing && offset < 0) {
             done = write(h, mem(w) + buffer, length);
-        } else if (writing) {
-            done = pwrite(h, mem(w) + buffer, length, offset + total);
         } else if (offset < 0) {
             done = read(h, mem(w) + buffer, length);
         } else {
-            done = pread(h, mem(w) + buffer, length, offset + total);
+            done = host_positioned(h, mem(w) + buffer, length, offset + total, writing);
         }
         if (done < 0) {
             return errno_to_wasi(errno);
@@ -372,14 +524,14 @@ u32 WASI(fd_pwrite)(Wasi *w, u32 fd, u32 iovs, u32 count, u64 offset, u32 out) {
 
 u32 WASI(fd_seek)(Wasi *w, u32 fd, u64 offset, u32 whence, u32 out) {
     int h = host(w, fd);
-    off_t at;
+    int64_t at;
 
     if (h < 0) {
         return WASI_EBADF;
     } else {
         /* An open file */
     }
-    at = lseek(h, (off_t)(int64_t)offset, seek_whence(whence));
+    at = host_seek(h, (int64_t)offset, seek_whence(whence));
     if (at < 0) {
         return errno_to_wasi(errno);
     } else {
@@ -393,7 +545,7 @@ u32 WASI(fd_tell)(Wasi *w, u32 fd, u32 out) {
     return WASI(fd_seek)(w, fd, 0, WASI_WHENCE_CUR, out);
 }
 
-static void filestat(Wasi *w, const struct stat *s, u32 out) {
+static void filestat(Wasi *w, const HostStat *s, u32 out) {
     memset(mem(w) + out, 0, FILESTAT_BYTES);
     put64(w, out, (u64)s->st_dev);
     put64(w, out + FILESTAT_INO_OFFSET, (u64)s->st_ino);
@@ -404,7 +556,7 @@ static void filestat(Wasi *w, const struct stat *s, u32 out) {
 
 u32 WASI(fd_fdstat_get)(Wasi *w, u32 fd, u32 out) {
     int h = host(w, fd);
-    struct stat s;
+    HostStat s;
 
     if (h < 0) {
         return WASI_EBADF;
@@ -412,12 +564,14 @@ u32 WASI(fd_fdstat_get)(Wasi *w, u32 fd, u32 out) {
         /* An open file */
     }
     memset(mem(w) + out, 0, FDSTAT_BYTES);
-    if (fstat(h, &s) != 0) {
+    if (fd == PREOPEN_FD) {
+        /* The preopened root, whose rights a path_open under it inherits: on Windows a slot only (ROOT_SLOT_ONLY) */
+        mem(w)[out] = FILETYPE_DIRECTORY;
+    } else if (host_fstat(h, &s) != 0) {
         return errno_to_wasi(errno);
     } else {
-        /* Its type known */
+        mem(w)[out] = filetype(s.st_mode);
     }
-    mem(w)[out] = filetype(s.st_mode);
     put64(w, out + FDSTAT_RIGHTS_BASE_OFFSET, ALL_RIGHTS);
     put64(w, out + FDSTAT_RIGHTS_INHERITING_OFFSET, ALL_RIGHTS);
     return WASI_ESUCCESS;
@@ -425,14 +579,14 @@ u32 WASI(fd_fdstat_get)(Wasi *w, u32 fd, u32 out) {
 
 u32 WASI(fd_filestat_get)(Wasi *w, u32 fd, u32 out) {
     int h = host(w, fd);
-    struct stat s;
+    HostStat s;
 
     if (h < 0) {
         return WASI_EBADF;
     } else {
         /* An open file */
     }
-    if (fstat(h, &s) != 0) {
+    if (host_fstat(h, &s) != 0) {
         return errno_to_wasi(errno);
     } else {
         /* Its status known */
@@ -443,7 +597,7 @@ u32 WASI(fd_filestat_get)(Wasi *w, u32 fd, u32 out) {
 
 u32 WASI(path_filestat_get)(Wasi *w, u32 dirfd, u32 flags, u32 path, u32 length, u32 out) {
     char name[PATH_BYTES];
-    struct stat s;
+    HostStat s;
 
     (void)flags;
     if (dirfd != PREOPEN_FD) {
@@ -452,7 +606,7 @@ u32 WASI(path_filestat_get)(Wasi *w, u32 dirfd, u32 flags, u32 path, u32 length,
         /* Under the preopened root */
     }
     host_path(w, path, length, name);
-    if (stat(name, &s) != 0) {
+    if (host_stat(name, &s) != 0) {
         return errno_to_wasi(errno);
     } else {
         /* Its status known */
@@ -470,7 +624,7 @@ u32 WASI(path_create_directory)(Wasi *w, u32 dirfd, u32 path, u32 length) {
         /* Under the preopened root */
     }
     host_path(w, path, length, name);
-    return mkdir(name, CREATED_DIRECTORY_MODE) == 0 ? WASI_ESUCCESS : errno_to_wasi(errno);
+    return host_mkdir(name) == 0 ? WASI_ESUCCESS : errno_to_wasi(errno);
 }
 
 void WASI(proc_exit)(Wasi *w, u32 code) {
@@ -539,14 +693,30 @@ NOSYS(sock_send, u32 a, u32 b, u32 c, u32 d, u32 e)
 NOSYS(sock_shutdown, u32 a, u32 b)
 #pragma GCC diagnostic pop
 
-void Wasi_Start(int argc, char **argv) {
+/* A standard stream's descriptor, none (-1) for one not open: a Windows program without a console has none */
+static int standard_stream(FILE *stream) {
+    int fd = fileno(stream);
+
+    if (fd < 0) {
+        return -1;
+    } else {
+        return fd;
+    }
+}
+
+void Wasi_Start(int argc, char **argv, char **environment) {
     g_Wasi.argc = argc;
     g_Wasi.argv = argv;
+    g_Wasi.environment = environment;
     for (int i = 0; i < FDS_MAX; i++) {
         g_Wasi.host_fd[i] = -1;
     }
-    g_Wasi.host_fd[STDIN_FILENO] = STDIN_FILENO;
-    g_Wasi.host_fd[STDOUT_FILENO] = STDOUT_FILENO;
-    g_Wasi.host_fd[STDERR_FILENO] = STDERR_FILENO;
+    g_Wasi.host_fd[STDIN_FILENO] = standard_stream(stdin);
+    g_Wasi.host_fd[STDOUT_FILENO] = standard_stream(stdout);
+    g_Wasi.host_fd[STDERR_FILENO] = standard_stream(stderr);
+#ifdef _WIN32
+    g_Wasi.host_fd[PREOPEN_FD] = ROOT_SLOT_ONLY;
+#else
     g_Wasi.host_fd[PREOPEN_FD] = open("/", O_RDONLY | O_DIRECTORY);
+#endif
 }

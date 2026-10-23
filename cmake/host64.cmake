@@ -70,4 +70,13 @@ set_source_files_properties(${MODULE}/crash2_module.c ${WASM2C_RUNTIME}/wasm-rt-
 set_source_files_properties(src/host64/main.c src/host64/bridge.c src/host64/wasi.c src/render.c PROPERTIES
     COMPILE_OPTIONS "-std=gnu11;-Wall;-Wextra")
 target_link_libraries(crash2 PRIVATE SDL3::SDL3-shared m)
-set_target_properties(crash2 PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
+if(WIN32)
+    # As the 32-bit build's: 8 MB of stack, Linux's; a window's program, with no console of its own (an error shows in
+    # a message box); SDL3.dll beside it
+    target_link_options(crash2 PRIVATE -Wl,--stack,0x800000 -static-libgcc -mwindows)
+    add_custom_command(TARGET crash2 POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_FILE_DIR:crash2>
+        COMMENT "Copying SDL3.dll beside the program")
+else()
+    set_target_properties(crash2 PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
+endif()
