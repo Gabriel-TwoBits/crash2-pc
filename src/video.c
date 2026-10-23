@@ -50,6 +50,8 @@
 #define COLOUR_GREEN_SHIFT 8
 
 static SDL_Window *s_Window;
+/* When the game frame running on the game clock is to end, in the window */
+static Uint64 s_GameFrameEnd;
 static SDL_Renderer *s_Renderer;
 static SDL_Texture *s_Texture;
 static int s_Started;
@@ -240,6 +242,27 @@ static void pace(void) {
     } else {
         /* Late: the next frame counts from now */
         s_NextFrame = now;
+    }
+}
+
+/* On the game clock the game's time is pinned to its frames, each two vertical blanks long for it, and it waits for no
+ * second one: in the window, a game frame is held to the two */
+#define GAME_FRAME_BLANKS 2
+
+void Host_PaceGameFrame(void) {
+    Uint64 now;
+
+    if (s_Headless) {
+        return;
+    } else {
+        s_GameFrameEnd += FRAME_NS * GAME_FRAME_BLANKS;
+        now = SDL_GetTicksNS();
+    }
+    if (now < s_GameFrameEnd) {
+        SDL_DelayPrecise(s_GameFrameEnd - now);
+    } else {
+        /* Late: the next game frame counts from now */
+        s_GameFrameEnd = now;
     }
 }
 

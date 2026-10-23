@@ -13,6 +13,7 @@
 #include "precise.h"
 #include "render.h"
 #include "settings.h"
+#include "video.h"
 #include "psyq/host_psyq.h"
 #include "retail.h"
 
@@ -423,6 +424,7 @@ void Host_FrameEnding(void) {
     }
     s_GameFrame++;
     g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);
+    Host_PaceGameFrame();
     /* As run_game.lua's: the presses apply to the game frame after the one ending */
     if (s_Record != NULL) {
         s_Held = Host_InputButtons();
