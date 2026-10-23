@@ -289,57 +289,18 @@ matching"):
     the projection); objects the game culls by its own 4:3 bounds would come in late at the edges, none seen so far.
     The game's state follows the narrower projection (a different picture, the same play otherwise); the default 4:3
     plays the same frames as before. The software picture narrows too.
-    - **The world beside the view:** the game draws only the polygons its camera path's sort list (SLST) holds at the
-      camera's node, made for 4:3: wider, the edges showed the background where the world stopped. `src/world_view.c`
-      adds polygons to the list drawn, through `WORLD_SORT_LIST` (crash2-decomp a3ccf38). More polygons take more
-      primitives (the frame buffers' 89 KB already 76 used on Turtle Woods): with 16:9 chosen when a level opens, its
-      frame buffers are the host's, 256 KB (`FRAME_PRIMITIVES_ALLOC`); chosen while one is open, they become the
-      host's at the end of that game frame (`FRAME_ENDED`, where the frame drawn has gone to the GPU and the one being
-      built is empty), the game's freed; before, 16:9 chosen from the pause menu added nothing until the level opened
-      again. The objects still come and go by the game's draw lists.
-    - **The lists around, dropped:** first, on the side-on paths (kinds 3 and 8 by Crash2Recomp's notes), the polygons
-      of the lists 12 nodes ahead and behind were added, decoded from the camera's by the game's decoder. Its backward
-      decoding undoes a delta's swaps on the list it starts from: decoding from the game's own list scrambled it, the
-      game's next decoding went wrong (garbage polygons, then its memory and the textures overwritten), so the lists
-      were decoded from a copy. A decoding from a list not the node's own can loop for ever (`slst_merge`: a run to
-      insert past the list's end, never reached), and on Snow Go's bonus, dropped into from above, the picture stopped
-      for good with the bonus' title half in: the camera's list and node apart there is the likely cause, not
-      reproduced (no schedule reaches it). The worlds beside cover what the lists around added, without decoding.
-    - **The worlds beside, on every path:** the lists around don't hold all that 16:9 shows (in the warp room, path
-      kind 4, they added 2 to 4 polygons; on Turtle Woods' paths into the view, nothing seen), so each frame the loaded
-      worlds' polygons are projected as the GTE will (its rotation, H and offsets, as `Gfx_DrawWorlds` finds them;
-      a corner nearer than its division's limit, H / 2, at twice its offset) and those beside the 4:3 picture that
-      no list holds are added: every corner in front of the camera, their bounds on the screen and past the 4:3
-      picture's edge, with a 16-pixel margin both ways, the GPU drawing them (narrower than 1,024 pixels, lower than
-      512). The worlds' headers count their vertices (word 4), triangles (5) and quads (6), checked against their
-      tables' sizes; a world not loaded has none. The warp room's right edge
-      and Turtle Woods' corners now drawn; at most 897 polygons added and 102 KB of primitives a frame on Turtle
-      Woods; the game's objects at 16:9 the same as before at 6 game frames.
-    - **Cut at the camera:** a polygon beside reaching nearer than the GTE's division's limit (H / 2) or behind the
-      camera, or wider or higher than the GPU draws, the GTE and the GPU draw wrong or not at all: left out, it was a
-      hole where it would show (in Snow Go's bonus' narrow shaft, black wedges at the edges); projected outward as the
-      GTE does, it stretched over what lay beside (tried, black triangles and smears at Turtle Woods' edges). Such a
-      polygon is cut at a plane 32 units past that limit, at four planes 128 pixels beyond the screen's edges and at
-      the 4:3 picture's edge (a piece each side), and its pieces drawn as triangles of a world the host makes in a
-      scratchpad slot the zone leaves free (one for each world cut from, at its position from the camera, so the
-      corners kept keep their exact positions; a new corner rounded to a vertex's 16 units), with its own vertices,
-      colours and textures (a new corner's colour, u and v between its edge's two, an animated texture taken at the
-      clock's frame). The 4:3 picture stays the game's: cutting the camera's own polygons too drew the trees and walls
-      against the camera that its lists keep but the PlayStation never drew, their textures stretched across the
-      screen, worse on the paths into the view. The program's data end at 0x807ED000 with the 4 host worlds' tables,
-      78 KB (the heap's base 64 KB further, the game the same).
-    - **Where the polygons beside go:** a list goes from the farthest polygon to the nearest, and `Gfx_DrawWorlds`
-      draws it from its end, linking each polygon no nearer than those before it (`link_primitive`): placed first in
-      the list, the polygons beside were drawn behind all the camera's and in no order among themselves (the warp
-      room's pillars at the right edge holed by black triangles, frame by frame, as the camera turned; black
-      triangles in the Snow Go portal). A polygon wholly beside the 4:3 picture is placed after the camera's last
-      entry as deep (the sum of the depths of the corners the game's slot sums) and the farther first among the
-      added; one reaching into the 4:3 picture stays first, behind all: the camera's list leaves it out where it
-      would show at 4:3, hidden there (a face turned away, most often, which by its depth went in front of the
-      pillars hiding it). A list may draw only a quad's first or last triangle; the other half beside is added, where
-      it was left out with the whole quad. The edges' popping counted on the warp room's dumped frames (the share of
-      black in the outer 40 columns rising for one frame) went from 5 cases to 2: a camera cut, and the Hang Eight
-      portal's inside black for 2 frames as it comes in at the edge, not traced yet.
+    - **The world beside the view, tried and dropped:** the game draws only the polygons its camera path's sort list
+      (SLST) holds at the camera's node, made for 4:3, so at 16:9 the world comes and goes at the edges. A host's list
+      (`WORLD_SORT_LIST`, with larger frame buffers through `FRAME_PRIMITIVES_ALLOC`, crash2-decomp a3ccf38) added
+      first the lists of the nodes around (decoded by the game's decoder: its backward decoding undoes a delta's swaps
+      on the list it starts from, and from the game's own list it scrambled it, its memory and textures then
+      overwritten; from a list not the node's own it can loop for ever, `slst_merge`), then the loaded worlds'
+      polygons beside the 4:3 picture, projected as the GTE will (a world's header counts its vertices, triangles and
+      quads, words 4 to 6), placed by depth (a list goes from the farthest polygon to the nearest and `link_primitive`
+      links none nearer than those before it), and those reaching behind the camera cut by the host into triangles of
+      worlds it made in the scratchpad's free slots. The edges filled, but artefacts stayed at them and within, and
+      on Snow Go's bonus the camera stopped for good with every setting tried (60 frames or not, 16:9 or not), not
+      reproduced here: all of it was removed, the decomp's hooks left unused.
 13. **The frame rate (done, 60 as an option).** The game's logic stays at its 30 frames a second, as on the
     PlayStation, and a frame of the picture alone is drawn between two of its (`src/between.c`, decomp's
     `FRAME_BETWEEN`, `FRAME_BETWEEN_SHOWN` and `FRAME_ENDED`, crash2-decomp d7053e9): at a game frame's end the camera

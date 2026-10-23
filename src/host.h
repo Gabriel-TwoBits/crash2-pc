@@ -32,15 +32,6 @@ extern unsigned int g_HostGte[];
 /* The arguments the PlayStation's code passes on in registers, unnamed there */
 #define PASSED_ON(arguments...) arguments
 
-
-/* The world drawn beside the camera's view for the wide view, into larger frame buffers (world_view.c) */
-#define WORLD_SORT_LIST(list) Host_WorldSortList((unsigned short *)(list))
-#define FRAME_PRIMITIVES_ALLOC(bytes) Host_FramePrimitivesAlloc(bytes)
-#define FRAME_PRIMITIVES_FREE(buffer) Host_FramePrimitivesFree(buffer)
-unsigned short *Host_WorldSortList(unsigned short *list);
-int Host_FramePrimitivesAlloc(int bytes);
-void Host_FramePrimitivesFree(int buffer);
-
 /* At 60 frames a second, a frame of the picture alone between two of the game's (between.c) */
 #define FRAME_BETWEEN Host_FrameBetween()
 #define FRAME_BETWEEN_SHOWN() Host_FrameBetweenShown()

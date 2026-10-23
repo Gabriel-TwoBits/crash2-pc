@@ -4,7 +4,6 @@
 #include "between.h"
 #include "gool.h"
 #include "settings.h"
-#include "world_view.h"
 
 /* 60 frames a second (settings.h): the game's logic at its 30, as on the PlayStation, and a frame of the picture alone
  * between two of its (decomp's FRAME_BETWEEN), with the camera and each object halfway from where the game frame
@@ -173,7 +172,6 @@ static void camera_halfway(void) {
 }
 
 void Host_FrameEnded(void) {
-    WorldView_FrameEnded();
     s_DrawnX = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV);
     s_DrawnY = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV + sizeof(int16_t));
     if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED) ||
