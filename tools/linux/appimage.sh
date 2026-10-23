@@ -1,17 +1,26 @@
 #!/bin/sh
-# Inside the Linux release's container (tools/linux/build.sh): build-linux/ into build-linux/crash2-pc-linux.AppImage.
-# The program is 32-bit, which a 64-bit system rarely has the libraries for, its C library included: the AppImage
-# carries every library it loads, from 32-bit Debian, and AppRun starts it on the C library's own loader with them.
-# SDL3 draws in software where it finds no OpenGL, so no graphics driver is carried. The runtime, AppImage's type 2 for
-# x86-64 (the 64-bit system the game needs, docs/ROADMAP.md), is pinned by SHA-256.
+# Inside the Linux release's container (tools/linux/build.sh): a build into its AppImage.
+#   sh tools/linux/appimage.sh [BUILD i386|x86_64 APPIMAGE]
+# By default the 32-bit build, build-linux/ into build-linux/crash2-pc-linux.AppImage. A 64-bit system rarely has a
+# 32-bit program's libraries, its C library included, and the C library differs from one system to another: the
+# AppImage carries every library the program loads, from Debian, and AppRun starts it on the C library's own loader
+# with them, the 64-bit build's too. SDL3 draws in software where it finds no OpenGL, so no graphics driver is
+# carried. The runtime, AppImage's type 2 for x86-64 (the 64-bit system the game needs, docs/ROADMAP.md), is pinned by
+# SHA-256.
 set -eu
 
 RUNTIME_URL=https://github.com/AppImage/type2-runtime/releases/download/20251108/runtime-x86_64
 RUNTIME_SHA256=2fca8b443c92510f1483a883f60061ad09b46b978b2631c807cd873a47ec260d
-BUILD=build-linux
+BUILD=${1:-build-linux}
+ARCHITECTURE=${2:-i386}
+APPIMAGE=${3:-$BUILD/crash2-pc-linux.AppImage}
 APPDIR=$BUILD/AppDir
 LIBRARIES=$APPDIR/usr/lib
-APPIMAGE=$BUILD/crash2-pc-linux.AppImage
+case "$ARCHITECTURE" in
+    i386) SYSTEM_LIBRARIES=/usr/lib/i386-linux-gnu LOADER=ld-linux.so.2 ;;
+    x86_64) SYSTEM_LIBRARIES=/usr/lib/x86_64-linux-gnu LOADER=ld-linux-x86-64.so.2 ;;
+    *) echo "$ARCHITECTURE: an AppImage for i386 or x86_64" >&2; exit 2 ;;
+esac
 # The libraries SDL3 loads when it runs (its X11, Wayland, audio and udev support), as its build configured them
 SDL_CONFIG=$(ls "$BUILD"/_deps/sdl3-build/include-config-*/build_config/SDL_build_config.h)
 LOADED=$(sed -n 's/^#define SDL_[A-Z0-9_]*_DYNAMIC[A-Z0-9_]* "\(.*\)"$/\1/p' "$SDL_CONFIG")
@@ -22,14 +31,14 @@ mkdir -p "$APPDIR/usr/bin" "$LIBRARIES"
 cp "$BUILD/crash2" "$APPDIR/usr/bin/crash2"
 cp -L "$BUILD/_deps/sdl3-build/libSDL3.so.0" "$LIBRARIES/"
 for library in $LOADED; do
-    cp -L "/usr/lib/i386-linux-gnu/$library" "$LIBRARIES/"
+    cp -L "$SYSTEM_LIBRARIES/$library" "$LIBRARIES/"
 done
 # The program's and SDL3's debugging symbols left out, their symbol tables kept
 strip --strip-debug "$APPDIR/usr/bin/crash2" "$LIBRARIES/libSDL3.so.0"
 
 # Every library those load, the C library's loader among them, by the names they're asked for
 for object in "$APPDIR/usr/bin/crash2" "$LIBRARIES"/*; do
-    ldd "$object" | sed -n 's/^\s*\(\S*\) => \(\/\S*\) .*/\1 \2/p; s/^\s*\(\/\S*ld-linux\S*\) .*/ld-linux.so.2 \1/p'
+    ldd "$object" | sed -n "s/^\s*\(\S*\) => \(\/\S*\) .*/\1 \2/p; s/^\s*\(\/\S*ld-linux\S*\) .*/$LOADER \1/p"
 done | sort -u | while read -r name path; do
     cp -L "$path" "$LIBRARIES/$name"
 done
@@ -44,10 +53,11 @@ done
 
 cat > "$APPDIR/AppRun" <<'APPRUN'
 #!/bin/sh
-# The game on the 32-bit libraries the AppImage carries, its C library's loader among them
+# The game on the libraries the AppImage carries, its C library's loader among them
 HERE=$(dirname "$(readlink -f "$0")")
-exec "$HERE/usr/lib/ld-linux.so.2" --library-path "$HERE/usr/lib" "$HERE/usr/bin/crash2" "$@"
+exec "$HERE/usr/lib/LOADER" --library-path "$HERE/usr/lib" "$HERE/usr/bin/crash2" "$@"
 APPRUN
+sed -i "s/LOADER/$LOADER/" "$APPDIR/AppRun"
 chmod +x "$APPDIR/AppRun"
 cat > "$APPDIR/crash2-pc.desktop" <<'DESKTOP'
 [Desktop Entry]

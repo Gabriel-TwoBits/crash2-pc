@@ -3,10 +3,10 @@
 # - test: a 64-bit system with no 32-bit library, where the AppImage must run on what it carries, with Xvfb's virtual
 #   display for a window;
 # - test-gpu: the test stage with 32-bit Vulkan, Mesa's lavapipe drawing in software, for the GPU renderer's window
-#   (tools/linux/run.sh --gpu);
+#   (tools/linux/run.sh --gpu); test-gpu64 the same with 64-bit Vulkan, for the 64-bit build's (--64 --gpu);
 # - build: GCC's 32-bit support, CMake, Ninja and Python for the build, glslang for the GPU renderer's shaders, the
-#   32-bit development files SDL3 builds its X11, Wayland (with EGL's), PulseAudio and ALSA support against (whose
-#   libraries the AppImage carries), and squashfs-tools for the AppImage's image.
+#   32-bit and 64-bit development files SDL3 builds its X11, Wayland (with EGL's), PulseAudio and ALSA support against
+#   (whose libraries the AppImages carry), and squashfs-tools for the AppImages' images.
 FROM docker.io/library/debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5 AS test
 
 RUN apt-get update \
@@ -20,6 +20,12 @@ RUN dpkg --add-architecture i386 \
     && apt-get install -y --no-install-recommends libvulkan1:i386 mesa-vulkan-drivers:i386 \
     && rm -rf /var/lib/apt/lists/*
 
+FROM test AS test-gpu64
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libvulkan1 mesa-vulkan-drivers \
+    && rm -rf /var/lib/apt/lists/*
+
 FROM test AS build
 
 RUN dpkg --add-architecture i386 \
@@ -29,4 +35,6 @@ RUN dpkg --add-architecture i386 \
         libx11-dev:i386 libxext-dev:i386 libxcursor-dev:i386 libxi-dev:i386 libxfixes-dev:i386 \
         libxrandr-dev:i386 libxss-dev:i386 libxkbcommon-dev:i386 libwayland-dev:i386 wayland-protocols \
         libegl-dev:i386 libpulse-dev:i386 libasound2-dev:i386 libudev-dev:i386 \
+        libx11-dev libxext-dev libxcursor-dev libxi-dev libxfixes-dev libxrandr-dev libxss-dev libxkbcommon-dev \
+        libwayland-dev libegl-dev libpulse-dev libasound2-dev libudev-dev \
     && rm -rf /var/lib/apt/lists/*

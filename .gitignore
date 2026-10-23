@@ -1,5 +1,6 @@
 build/
 build-linux/
+build-linux64/
 build-windows/
 .venv/
 __pycache__/
