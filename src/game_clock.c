@@ -40,7 +40,10 @@
  * position and velocity */
 #define OBJECTS_VARIABLE "CRASH2_GAME_CLOCK_OBJECTS"
 /* CRASH2_GAME_CLOCK_PRESSES=FILE: run_game.lua's schedule (decomp's build/run_game/NAME/schedule.txt), whose "press
- * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST, its other lines left to run_game.lua */
+ * FIRST LAST BUTTON" lines hold BUTTON from game frame FIRST to LAST and whose "pace VSYNC FIRST LAST COUNT" line
+ * makes game frames FIRST to LAST last at least COUNT vertical blanks each, as run_game.lua's: the first VSync(0)
+ * after Gfx_EndFrame's entry is given COUNT (VSYNC, VSync's address, is run_game.lua's). Its other lines are left to
+ * run_game.lua */
 #define PRESSES_VARIABLE "CRASH2_GAME_CLOCK_PRESSES"
 #define RECORD_VARIABLE "CRASH2_GAME_CLOCK_RECORD"
 #define PRESSES_GROWTH 256
@@ -51,6 +54,9 @@
 #define BUTTON_NAME_BYTES 16
 #define PRESS_FORMAT "%d %d %15s"
 #define PRESS_FIELDS 3
+#define PACE_COMMAND "pace "
+#define PACE_FORMAT "%x %d %d %d"
+#define PACE_FIELDS 4
 /* The PlayStation's 2 MB, which holds the retail image's data and bss (retail.h) */
 #define RAM_BYTES 0x200000
 #define RAM_ADDRESS_MASK (RAM_BYTES - 1)
@@ -88,6 +94,11 @@ static Press *s_Presses;
 static int s_PressCount;
 static int s_PressRoom;
 static unsigned int s_Held;
+/* The schedule's pace: whether it has one, its game frames and their vertical blanks, and whether the game frame
+ * running has yet to be given them */
+static int s_Paced;
+static int s_PaceFirst, s_PaceLast, s_PaceBlanks;
+static int s_PacePending;
 /* The run being recorded, and the game frame each button's hold began in (NOT_HELD if it isn't held) */
 static FILE *s_Record;
 static int s_HeldFrom[sizeof(unsigned int) * 8];
@@ -117,6 +128,18 @@ static unsigned int button_named(const char *name) {
     return 0;
 }
 
+static void read_pace(const char *line) {
+    unsigned int vsync;
+
+    if (sscanf(line + strlen(PACE_COMMAND), PACE_FORMAT, &vsync, &s_PaceFirst, &s_PaceLast, &s_PaceBlanks) !=
+            PACE_FIELDS ||
+        s_PaceFirst > s_PaceLast || s_PaceBlanks < 1) {
+        Host_Fatal("%s: a pace line it can't take: %s", PRESSES_VARIABLE, line);
+    } else {
+        s_Paced = 1;
+    }
+}
+
 static void read_presses(const char *path) {
     FILE *file = fopen(path, "r");
     char line[LINE_BYTES];
@@ -128,7 +151,10 @@ static void read_presses(const char *path) {
             char name[BUTTON_NAME_BYTES];
             Press press;
 
-            if (strncmp(line, PRESS_COMMAND, strlen(PRESS_COMMAND)) != 0) {
+            if (strncmp(line, PACE_COMMAND, strlen(PACE_COMMAND)) == 0) {
+                read_pace(line);
+                continue;
+            } else if (strncmp(line, PRESS_COMMAND, strlen(PRESS_COMMAND)) != 0) {
                 continue;
             } else if (sscanf(line + strlen(PRESS_COMMAND), PRESS_FORMAT, &press.first, &press.last, name) !=
                        PRESS_FIELDS) {
@@ -167,6 +193,16 @@ static unsigned int held_in(int frame) {
 
 unsigned int Host_ClockButtons(void) {
     return s_Held;
+}
+
+int Host_PacedVSync(int mode) {
+    if (s_PacePending && mode == 0) {
+        s_PacePending = 0;
+        return s_PaceBlanks;
+    } else {
+        /* Another call: a count other than 0, or the frame already paced or not paced */
+        return mode;
+    }
 }
 
 /* A button's index among the pad's bits */
@@ -424,6 +460,7 @@ void Host_FrameEnding(void) {
     }
     s_GameFrame++;
     g_TimerTicks = (unsigned int)(s_GameFrame * GAME_FRAME_TICKS);
+    s_PacePending = s_Paced && s_GameFrame >= s_PaceFirst && s_GameFrame <= s_PaceLast;
     Host_PaceGameFrame();
     /* As run_game.lua's: the presses apply to the game frame after the one ending */
     if (s_Record != NULL) {

@@ -52,6 +52,8 @@ static int s_Running[ROOT_COUNTERS];
 /* CPU cycles, times VIDEO_HZ, since root counter 2's last interrupt */
 static unsigned long long s_Counter2Cycles;
 static int s_Frames;
+/* The blanks at VSync's last return, from which VSync(n) counts */
+static int s_LastVSync;
 /* CPU cycles, times VIDEO_HZ, not yet given to the SPU */
 static unsigned long long s_SpuCycles;
 
@@ -268,19 +270,20 @@ void Host_VerticalBlank(void) {
     }
 }
 
-/* VSync(n) waits n blanks (0 the next one); a negative mode returns the blanks so far without waiting */
+/* VSync(0) waits for the next blank, VSync(n) until n blanks have passed since its last return (the game frame's
+ * first VSync(0) takes the game clock's pace, game_clock.c); a negative mode returns the blanks so far without
+ * waiting */
 int VSync(int mode) {
-    int blanks;
-
+    mode = Host_PacedVSync(mode);
     if (mode < 0) {
         return s_Frames;
     } else if (mode == 0) {
         Host_VerticalBlank();
-        return s_Frames;
     } else {
-        for (blanks = 0; blanks < mode; blanks++) {
+        while (s_Frames - s_LastVSync < mode) {
             Host_VerticalBlank();
         }
-        return s_Frames;
     }
+    s_LastVSync = s_Frames;
+    return s_Frames;
 }

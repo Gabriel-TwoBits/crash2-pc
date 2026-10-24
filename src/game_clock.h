@@ -7,5 +7,7 @@ int Host_GameClock(void);
 void Host_FrameEnding(void);
 /* The buttons held in the game frame running: CRASH2_GAME_CLOCK_PRESSES's, or the player's recorded */
 unsigned int Host_ClockButtons(void);
+/* VSync's mode as the schedule's pace gives it: its count for the game frame's first VSync(0), mode otherwise */
+int Host_PacedVSync(int mode);
 
 #endif /* GAME_CLOCK_H */
