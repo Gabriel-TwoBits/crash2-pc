@@ -58,6 +58,10 @@ void Host_GteProjected(unsigned int sxy, const long long *view, unsigned int h, 
 /* A path where the PlayStation's code reads what its callers left, which the C has no value for (host_log.c) */
 #define CALLER_LEFT(function) Host_CallerLeft(#function)
 void Host_CallerLeft(const char *function);
+/* On such a path, a value for the variable the C leaves unset, and a return where the PlayStation's code returns what
+ * its $v0 holds: decomp's own, so an optimizing compiler has one to keep */
+#define CALLER_LEFT_VALUE(variable, value) ((variable) = (value))
+#define LEFT_RETURN(value) return (value)
 
 /* The operations of the host's patches of the game's GOOL code (menus.c) */
 #define GOOL_HOST_OPERATION Host_GoolOperation
