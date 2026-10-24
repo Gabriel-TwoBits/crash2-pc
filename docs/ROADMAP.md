@@ -342,7 +342,7 @@ matching"):
       frame between, its scene drawn anew, alternated with it each vertical blank, a stutter as it opened and closed.
       A frame is shown at its display environment's corner: the drawing area's, 12 lines lower on the memory card's
       screens, shook the picture.
-14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
+14. **Alongside (done).** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
     - **The game's C at -O2 (done):** each of the 33 files alone at -O2 against the -O0 build: three parted from it,
       `800123F0.c` (the demo's hashes from game frame 7, then stuck), `800158E0.c` (a crash at start-up) and
       `80029884.c` (from game frame 1,979). `-fno-aggressive-loop-optimizations` put each right, and the functions it
@@ -387,7 +387,8 @@ matching"):
     - Without a pace line nothing changes: a read and the DMA end at once, and the demo's, the card's and the recorded
       run's frames, sound and card are as before. The paced runs write the same `game_frames.txt`, CD log and SPU log
       on the 32-bit and 64-bit builds, on Linux and under Wine.
-    - **Windows itself:** left, as in milestone 8: no machine here runs it.
+    - **Windows itself (waiting on players, 2026-10-24):** no machine here runs it and no one will test it for now: a
+      player's report on GitHub (an issue) brings it up, and it is handled then. It holds no milestone back.
 15. **Players' bugs, by their recorded runs.** A player records a run in the window (`CRASH2_GAME_CLOCK_RECORD`,
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
