@@ -346,17 +346,48 @@ matching"):
     - **The game's C at -O2 (done):** each of the 33 files alone at -O2 against the -O0 build: three parted from it,
       `800123F0.c` (the demo's hashes from game frame 7, then stuck), `800158E0.c` (a crash at start-up) and
       `80029884.c` (from game frame 1,979). `-fno-aggressive-loop-optimizations` put each right, and the functions it
-      changes there loop over a structure's last array, declared with one element and indexed past it as the PlayStation's
-      code does: `Gfx_Init`'s over `g_FrameBuffers.e` (2 buffers, GCC 14 setting up 1), the paging's over
-      `D_80067950.e` and `D_800675B0.e`, `func_8002A554`'s and its neighbours' over `D_8006CB6C.p`. A variable of such a type bounds the loop
-      for GCC to the one element. With those four declarations made flexible (`[0]`) in a copy, all 33 files at plain
-      -O2 played the demo as the -O0 build; 13 such arrays are in the C, the declarations' fix asked of the
-      decompilation. GCC 2.7.2 made no such assumption, so `GAME_SEMANTICS` takes the flag, beside `-fwrapv` and the
-      others, and the game's C is built at the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game frames,
-      the memory-card run and a player's recorded run of 4,200 give the same `game_frames.txt`, SPU log and card as at
-      -O0, and the native code's 9,566 runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's and the
-      card's the same. Headless, the demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the game's C at
-      -O0.
+      changes there loop over a structure's last array, declared with one element and indexed past it as the
+      PlayStation's code does: `Gfx_Init`'s over `g_FrameBuffers.e` (2 buffers, GCC 14 setting up 1), the paging's over
+      `D_80067950.e` and `D_800675B0.e`, `func_8002A554`'s and its neighbours' over `D_8006CB6C.p`. A variable of such a
+      type bounds the loop for GCC to the one element. With those four declarations made flexible (`[0]`) in a copy, all
+      33 files at plain -O2 played the demo as the -O0 build; 13 such arrays are in the C, the declarations' fix asked
+      of the decompilation. GCC 2.7.2 made no such assumption, so `GAME_SEMANTICS` takes the flag, beside `-fwrapv` and
+      the others, and the game's C is built at the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game
+      frames, the memory-card run and a player's recorded run of 4,200 give the same `game_frames.txt`, SPU log and card
+      as at -O0, and the native code's 9,566 runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's
+      and the card's the same. Headless, the demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the
+      game's C at -O0.
+    - **The CD's timing (done, on paced runs):** a schedule's `pace` line (run_game.lua's) now paces the port's game
+      frames too: the game frame's first VSync(0) waits its count, and VSync(n) counts from its last return, as
+      libetc's.
+      With one, the drive takes its time as PCSX-Redux models it (`src/psyq/libcd.c`): a command's acknowledge (797
+      µs), ReadN's start (20 ms), a seek (3 µs a sector, then 1 ms), a sector each 6,666 µs at double speed, 650 ms to
+      change speed; the CPU's time, the blanks', passes while the game waits on the drive (`Host_Wait`), and a poll
+      that finds it busy passes the 2,500 cycles the game's polling loop takes on the PS1 (some 90 a sector), so the
+      blanks come during a load as there. `tools/cd_log.lua` logs the game's libcd calls in run_game's emulator, the
+      CPU's cycles at each call and return, `CRASH2_CD_LOG` the port's in the same format. What the PS1's log showed of
+      libcd: after a read's last sector it sends Pause (35 ms), which keeps CdSync(1) at 0; a command waits for the last
+      one to complete (CdControl's Setloc after a read takes 35.9 ms); CdRead waits for Setmode's acknowledge only when
+      the mode changes. On the attract demo paced at 5 vsyncs from game frame 1, the first read's 678.7 ms (the spin to
+      double speed among them) are 678.5 on the port, and the 812 calls of its first 600 game frames, their arguments
+      and results, are the PS1's, but how many times a poll repeats.
+    - **The sound's DMA's time:** with the drive timed, the game's RAM parted from the PS1's at game frame 10, in the
+      paging: the game uploads a sound page to the SPU and asks at once whether the DMA is over, which the PS1 answers
+      no, ending the page the next game frame, and the port yes. On paced runs the DMA now ends after its words / 2
+      cycles, as PCSX-Redux times it (`src/sdk.c`), at the next blank, or at once when the libraries read a DMA
+      register. Then the variables are the PS1's at game frames 1 to 50 but `D_8006CCB8` (milestone 6), at 300 but 2
+      words, at 600 but 5 (the voices' state `D_8005FC6C`, a sound counter): before, 37 differed at game frame 50. On
+      the whole demo, 4,800 game frames: the libcd calls are the PS1's to game frame 1,826, where a level loads and the
+      PS1's CPU makes a game frame outlast the pace, after which the port's reads run a sector ahead; at game frame
+      2,000 one word differs, at 4,000 ten, at 4,800 22 (the voices, some of the paging's slots). At 1,000 and 3,000,
+      at the title, the primitive buffers' 250 pointers (`g_BuildBuffer`, `D_800654E8`) are also all 0x6016C away,
+      the same buffers at another place, which `tools/compare_ram.py` doesn't map. TRADEOFF: the game's own CPU time
+      isn't modelled, so frames the PS1's load makes longer than the pace part the runs a little; a frame's cost
+      measured on the PS1 would follow them further.
+    - Without a pace line nothing changes: a read and the DMA end at once, and the demo's, the card's and the recorded
+      run's frames, sound and card are as before. The paced runs write the same `game_frames.txt`, CD log and SPU log
+      on the 32-bit and 64-bit builds, on Linux and under Wine.
+    - **Windows itself:** left, as in milestone 8: no machine here runs it.
 15. **Players' bugs, by their recorded runs.** A player records a run in the window (`CRASH2_GAME_CLOCK_RECORD`,
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
