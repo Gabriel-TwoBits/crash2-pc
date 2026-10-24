@@ -28,12 +28,14 @@ GLOBAL_BASE = 0x80070000
 STACK_BYTES = 0x800000
 INITIAL_MEMORY = 0x82000000
 MAX_MEMORY = 0x100000000
-# The game's C as the native build compiles it (CMakeLists.txt), for clang: GCC's warnings among its errors
-GAME_FLAGS = ["-O0", "-std=gnu89", "-w", "-fcommon", "-fno-strict-aliasing", "-fwrapv",
-              "-fno-delete-null-pointer-checks", "-fno-zero-initialized-in-bss", "-fdata-sections",
+# The game's C as the native build compiles it (CMakeLists.txt), for clang: GCC's warnings among its errors. Its IR is
+# clang's unoptimized one, which the passes below read, kept optimizable for its objects (GAME_OPTIMIZATION)
+GAME_FLAGS = ["-O0", "-Xclang", "-disable-O0-optnone", "-std=gnu89", "-w", "-fcommon", "-fno-strict-aliasing",
+              "-fwrapv", "-fno-delete-null-pointer-checks", "-fno-zero-initialized-in-bss", "-fdata-sections",
               "-Wno-error=incompatible-function-pointer-types", "-Wno-error=int-conversion",
               "-Wno-error=incompatible-pointer-types", "-D__asm__(...)=", "-DNON_MATCHING", "-DGTE_MODEL",
               "-Dmain=Game_Main"]
+GAME_OPTIMIZATION = "-O2"
 HOST_DEFINES = ["-D_WASI_EMULATED_SIGNAL", "-D_WASI_EMULATED_PROCESS_CLOCKS"]
 # libgte's functions run the decompilation's GTE model, compiled with the game's C's semantics
 LIBGTE = "src/psyq/libgte.c"
@@ -168,8 +170,10 @@ def main():
     print(run([sys.executable, "-I", str(HERE / "wasm_data.py"), str(DECOMP), str(out / "data"),
                *map(str, game_ir), *map(str, host_ir)]).strip())
     data_ir = [out / "data" / name for name in ("retail_data_a.ll", "retail_data_c.ll", "retail_data_z.ll")]
-    parallel([[str(clang), *target, "-O0", "-Wno-override-module", "-c", str(ir), "-o", str(ir.with_suffix(".o"))]
-              for ir in game_ir + data_ir])
+    parallel([[str(clang), *target, GAME_OPTIMIZATION, "-Wno-override-module", "-c", str(ir),
+               "-o", str(ir.with_suffix(".o"))] for ir in game_ir]
+             + [[str(clang), *target, "-O0", "-Wno-override-module", "-c", str(ir), "-o", str(ir.with_suffix(".o"))]
+                for ir in data_ir])
 
     # Linked: the split's data, the game's files' variables, the split's bss, in that order, then the rest
     module = out / "crash2.wasm"
