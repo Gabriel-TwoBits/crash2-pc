@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "game_clock.h"
 #include "host_log.h"
 #include "mips.h"
 #include "psyq/host_psyq.h"
@@ -60,6 +61,9 @@
 #define DMA_INTERRUPT_FLAGS 0x7F000000u
 #define DMA_CHANNELS 8
 #define IRQ_DMA (1u << 3)
+/* The sound's DMA moves this many words a CPU cycle, as PCSX-Redux times it (src/core/psxdma.cc, at its commit
+ * 8d405b66) */
+#define SPU_DMA_WORDS_PER_CYCLE 2u
 #define VIDEO_MODE_NTSC 0
 #define CRITICAL_ENTERED 1
 /* libetc's interrupt callbacks: by interrupt, of which the host delivers the vertical blank's */
@@ -87,13 +91,17 @@ static uint32_t s_VSyncCallback;
 static uint32_t s_DmaCallback[DMA_CHANNELS];
 static uint32_t s_InterruptCallback[CALLBACK_CHANNELS];
 static int s_Critical;
+/* On a paced run (libcd.c's drive timing), the sound's DMA in flight and the CPU's cycle it ends at */
+static int s_DmaRunning;
+static unsigned long long s_DmaEnd;
 
 static uint32_t *dma_register(uint32_t address) {
     return &s_Dma[(address - DMA_START) / WORD_BYTES];
 }
 
-/* The sound's DMA, from RAM to the SPU's RAM at its transfer address, at once.
- * TRADEOFF: the SPU's 32-halfword FIFO and the transfer's time left out; the libraries wait for its end only */
+/* The sound's DMA, from RAM to the SPU's RAM at its transfer address, at once; it ends at once too, but on a paced run,
+ * where it ends after its time (finish_dma).
+ * TRADEOFF: the SPU's 32-halfword FIFO left out; the libraries wait for its end only */
 static void spu_dma(void) {
     uint32_t base = DMA_START + DMA_SPU * DMA_CHANNEL_BYTES;
     uint32_t control = *dma_register(base + DMA_CONTROL);
@@ -113,7 +121,12 @@ static void spu_dma(void) {
 
             Spu_WriteRam(target + index * WORD_BYTES, &word, WORD_BYTES);
         }
-        *dma_register(base + DMA_CONTROL) = control & ~DMA_BUSY;
+    }
+    s_DmaRunning = 1;
+    if (Host_GameClockPaced()) {
+        s_DmaEnd = Host_Cycles() + words / SPU_DMA_WORDS_PER_CYCLE;
+    } else {
+        s_DmaEnd = 0;
     }
 }
 
@@ -140,6 +153,25 @@ static void deliver_dma(void) {
     }
 }
 
+/* The sound's DMA ended by the CPU's cycle now: the channel free, and its interrupt delivered (as the interpreter's
+ * pending one when it runs); ALWAYS ends it whatever the time, for a read of the channel the CPU would poll till
+ * then */
+static void finish_dma(int always, int interpreting) {
+    uint32_t control = DMA_START + DMA_SPU * DMA_CHANNEL_BYTES + DMA_CONTROL;
+
+    if (!s_DmaRunning || (!always && Host_Cycles() < s_DmaEnd)) {
+        return;
+    } else {
+        s_DmaRunning = 0;
+        *dma_register(control) &= ~DMA_BUSY;
+    }
+    if (interpreting) {
+        Mips_SetPending(deliver_dma);
+    } else {
+        deliver_dma();
+    }
+}
+
 static uint32_t io_read(uint32_t address, int bytes) {
     if (address >= SPU_START && address < SPU_END && bytes == HALF_BYTES) {
         Spu_Advance(SPU_READ_CYCLES);
@@ -152,6 +184,7 @@ static uint32_t io_read(uint32_t address, int bytes) {
     } else if (address == INTERRUPT_MASK) {
         return s_InterruptMask;
     } else if (address >= DMA_START && address < DMA_END && bytes == WORD_BYTES) {
+        finish_dma(1, 1);
         return *dma_register(address);
     } else if (address >= MEMORY_CONTROL_START && address < MEMORY_CONTROL_END && bytes == WORD_BYTES) {
         return s_MemoryControl[(address - MEMORY_CONTROL_START) / WORD_BYTES];
@@ -192,7 +225,7 @@ static void io_write(uint32_t address, uint32_t value, int bytes) {
         *dma_register(address) = value;
         if (value & DMA_BUSY) {
             spu_dma();
-            Mips_SetPending(deliver_dma);
+            finish_dma(0, 1);
         } else {
             /* Stopped */
         }
@@ -345,6 +378,7 @@ void Host_SoundStart(void) {
 /* A vertical blank's interrupt: its interrupt callback (libsnd's tick, in the game's tick mode) and libetc's VSync
  * callback */
 void Host_SoundVerticalBlank(void) {
+    finish_dma(0, 0);
     if (s_InterruptCallback[IRQ_VERTICAL_BLANK] != 0) {
         Mips_Call(s_InterruptCallback[IRQ_VERTICAL_BLANK], NULL, 0);
     } else {

@@ -56,7 +56,11 @@ from a module in a draft release's `crash2-module.tar.gz` (the split needs the p
   DISC.cue` dumps its own, and `tools/compare_ram.py PS1.bin DIR/ram_N.bin build/crash2 decomp` names the variables
   that differ.
 - Presses on the game clock: `CRASH2_GAME_CLOCK_PRESSES=FILE` takes a run_game schedule's press lines (decomp's
-  `build/run_game/NAME/schedule.txt`), so the port plays the PS1's run. The memory card against the PS1: decomp's
+  `build/run_game/NAME/schedule.txt`), so the port plays the PS1's run, and its pace line: those game frames last as
+  many vertical blanks as on the PS1, and the CD drive and the sound's DMA take their time (docs/ROADMAP.md, milestone
+  14), as they don't without one. The CD against the PS1: `tools/cd_log.lua` (its header has the command) logs the
+  game's libcd calls in run_game's emulator, `CRASH2_CD_LOG=FILE` the port's, a line each in the same format (game
+  frame, CPU cycles at the call and at its return, call, result). The memory card against the PS1: decomp's
   `tools/run_game.py DISC.cue --schedule memory-card --against retail` saves on an empty card
   (`build/run_game/retail/memcard1.mcd`); the port with that schedule's presses and `CRASH2_MEMORY_CARD=FILE` on a new
   file (3,500 game frames) saves its own, to compare frame by frame.
