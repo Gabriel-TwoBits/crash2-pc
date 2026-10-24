@@ -33,7 +33,7 @@ README.md, "Building": the decompilation split in `decomp/` (its own `.venv`, ig
 runs it. GCC with 32-bit support (`gcc-multilib` on Debian). CMake fetches SDL3 3.2.10 (pinned by SHA-256) and builds it
 for 32-bit x86: Debian's i386 package conflicts with backports' Mesa. The build is RelWithDebInfo unless asked
 otherwise, the game's C with it, under GCC 2.7.2's semantics (`GAME_SEMANTICS`, docs/ROADMAP.md, milestone 14); the
-64-bit build's module keeps the game's C at -O0. A change that should leave the game as it is shows it by the same
+64-bit build's module at -O2 too (milestone 16). A change that should leave the game as it is shows it by the same
 `game_frames.txt` hashes as before.
 
 The 64-bit build: `cmake -S . -B build64 -G Ninja` with the system's own 64-bit compiler, then `cmake --build build64`;

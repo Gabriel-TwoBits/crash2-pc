@@ -356,7 +356,7 @@ matching"):
       the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game frames, the memory-card run and a player's
       recorded run of 4,200 give the same `game_frames.txt`, SPU log and card as at -O0, and the native code's 9,566
       runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's and the card's the same. Headless, the
-      demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the game's C at -O0.
+      demo takes 7.9 s instead of 10.5. The 64-bit build's module followed (milestone 16, "The game's C at -O2").
     - **The CD's timing (done, on paced runs):** a schedule's `pace` line (run_game.lua's) now paces the port's game
       frames too: the game frame's first VSync(0) waits its count, and VSync(n) counts from its last return, as
       libetc's. With one, the drive takes its time as PCSX-Redux models it (`src/psyq/libcd.c`): a command's acknowledge
@@ -461,3 +461,12 @@ matching"):
     - **Licences:** the program carries wasm2c's runtime (WABT, Apache-2.0) and wasi-libc (with musl's, cloudlibc's
       and musl-fts's notices), whose binary releases hold no licence: `cmake/host64.cmake` fetches the texts, pinned
       by SHA-256, and the zips, the AppImages and the Mac app carry them.
+    - **The game's C at -O2 (2026-10-24):** `tools/wasm/module.py` keeps the game's IR clang's unoptimized one, which
+      its passes read, but without the `optnone` -O0 marks it with (`-disable-O0-optnone`), and makes its objects at
+      -O2; `-fwrapv`, `-fno-strict-aliasing` and `-fno-delete-null-pointer-checks` are in the IR already. The demo's
+      6,000 game frames, the memory-card run, the recorded run of 4,200 and the paced demo's 600 write the same
+      `game_frames.txt`, SPU log, card and CD log as the 32-bit build, on Linux and the demo's and the card's under
+      Wine; the demo takes 7.3 s instead of 9.4 (the 32-bit build's 8.0). Clang's own check of the game's C at -O2
+      (`-Wsometimes-uninitialized`, `-Wreturn-type`) names five variables a path reads without a value and two functions
+      a path leaves without one, which change none of the runs above; their fix is asked of the decompilation, as clang
+      turns such a read into `poison` where GCC and the PS1 read what the register held.
