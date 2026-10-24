@@ -195,6 +195,14 @@ unsigned int Host_ClockButtons(void) {
     return s_Held;
 }
 
+int Host_GameFrame(void) {
+    return s_GameFrame;
+}
+
+int Host_GameClockPaced(void) {
+    return Host_GameClock() && s_Paced;
+}
+
 int Host_PacedVSync(int mode) {
     if (s_PacePending && mode == 0) {
         s_PacePending = 0;

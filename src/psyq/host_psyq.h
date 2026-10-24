@@ -7,12 +7,18 @@
 void Host_OpenDisc(const char *path);
 /* A file of the disc's root directory ("SCUS_941.54;1"), read whole into memory of malloc's */
 void *Host_ReadDiscFile(const char *name, unsigned int *bytes);
+/* The drive's sectors read by a vertical blank, into the read's buffer (libcd.c) */
+void Host_CdVerticalBlank(void);
 
 /* One vertical blank of the game's time: the root counter's interrupts it holds (libetc.c) */
 void Host_VerticalBlank(void);
 
 /* The vertical blanks so far (events.c) */
 int Host_Blanks(void);
+/* The CPU's cycles so far on the game's time: the blanks' and those the host's waits took since the last (events.c) */
+unsigned long long Host_Cycles(void);
+/* CYCLES of the CPU's time passed waiting on the hardware, with the blanks they reach (events.c) */
+void Host_Wait(unsigned long long cycles);
 
 /* Where libgpu last put the display, and whether it shows (libgpu.c) */
 void Host_DisplayArea(int *x, int *y, int *width, int *height, int *enabled);

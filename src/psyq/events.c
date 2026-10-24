@@ -16,6 +16,8 @@
 #define VIDEO_HZ 53693175ULL
 #define VIDEO_CYCLES_PER_LINE 3413ULL
 #define LINES_PER_FRAME 263ULL
+/* An NTSC frame's CPU cycles, times VIDEO_HZ */
+#define FRAME_CYCLES_SCALED (CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME)
 /* Root counter 2 counts the CPU's clock / 8: SetRCnt writes it the mode 0x258 (decomp's split, libapi's SetRCnt) */
 #define ROOT_COUNTER_2 0xF2000002
 #define ROOT_COUNTER_2_DIVIDER 8ULL
@@ -54,6 +56,8 @@ static unsigned long long s_Counter2Cycles;
 static int s_Frames;
 /* The blanks at VSync's last return, from which VSync(n) counts */
 static int s_LastVSync;
+/* CPU cycles, times VIDEO_HZ, the host's waits have taken since the last blank (Host_Wait) */
+static unsigned long long s_WaitCycles;
 /* CPU cycles, times VIDEO_HZ, not yet given to the SPU */
 static unsigned long long s_SpuCycles;
 
@@ -239,7 +243,7 @@ static void counter2_frame(void) {
     if (!s_Running[ROOT_COUNTER_2_INDEX] || period == 0) {
         return;
     } else {
-        s_Counter2Cycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
+        s_Counter2Cycles += FRAME_CYCLES_SCALED;
     }
     while (s_Counter2Cycles >= period) {
         s_Counter2Cycles -= period;
@@ -260,7 +264,8 @@ void Host_VerticalBlank(void) {
     Host_PadVerticalBlank();
     counter2_frame();
     Host_SoundVerticalBlank();
-    s_SpuCycles += CPU_HZ * VIDEO_CYCLES_PER_LINE * LINES_PER_FRAME;
+    Host_CdVerticalBlank();
+    s_SpuCycles += FRAME_CYCLES_SCALED;
     Host_AudioFrame((uint32_t)(s_SpuCycles / VIDEO_HZ));
     s_SpuCycles %= VIDEO_HZ;
     if (s_Frames % FRAMES_PER_LOG == 0) {
@@ -268,6 +273,27 @@ void Host_VerticalBlank(void) {
     } else {
         /* Between logs */
     }
+}
+
+unsigned long long Host_Cycles(void) {
+    unsigned long long frames = (unsigned long long)s_Frames;
+
+    return frames * (FRAME_CYCLES_SCALED / VIDEO_HZ) +
+           (frames * (FRAME_CYCLES_SCALED % VIDEO_HZ) + s_WaitCycles) / VIDEO_HZ;
+}
+
+void Host_Wait(unsigned long long cycles) {
+    s_WaitCycles += cycles * VIDEO_HZ;
+    while (s_WaitCycles >= FRAME_CYCLES_SCALED) {
+        s_WaitCycles -= FRAME_CYCLES_SCALED;
+        Host_VerticalBlank();
+    }
+}
+
+/* The CPU waits for the next blank: the cycles since the last are the wait's */
+static void wait_for_blank(void) {
+    s_WaitCycles = 0;
+    Host_VerticalBlank();
 }
 
 /* VSync(0) waits for the next blank, VSync(n) until n blanks have passed since its last return (the game frame's
@@ -278,10 +304,10 @@ int VSync(int mode) {
     if (mode < 0) {
         return s_Frames;
     } else if (mode == 0) {
-        Host_VerticalBlank();
+        wait_for_blank();
     } else {
         while (s_Frames - s_LastVSync < mode) {
-            Host_VerticalBlank();
+            wait_for_blank();
         }
     }
     s_LastVSync = s_Frames;
