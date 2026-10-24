@@ -129,13 +129,14 @@ add_dependencies(game host_data)
 target_include_directories(game BEFORE PRIVATE ${HOST_ASM})
 target_include_directories(game PRIVATE ${DECOMP}/include)
 target_compile_definitions(game PRIVATE NON_MATCHING GTE_MODEL main=Game_Main)
-# The PlayStation's GCC 2.7.2 assumed no strict aliasing, wrapping arithmetic and common symbols; the decompilation's
-# warnings are its own (-w). Each file's data stays in .data in its order, as the retail image's small data
-# (tools/check_layout.py). Unoptimized whatever the build's type: at -O2 the game's C plays otherwise (the demo's run
-# parts from the debug build's and stops on a polyline of over 256 vertices)
-set(GAME_SEMANTICS -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks)
+# The PlayStation's GCC 2.7.2 assumed no strict aliasing, wrapping arithmetic and common symbols, nor loops bounded by
+# an array's declared size: the C indexes structures' one-element last arrays past their end (docs/ROADMAP.md,
+# milestone 14). The decompilation's warnings are its own (-w). Each file's data stays in .data in its order, as the
+# retail image's small data (tools/check_layout.py). Optimized as the build's type says
+set(GAME_SEMANTICS -fcommon -fno-strict-aliasing -fwrapv -fno-delete-null-pointer-checks
+    -fno-aggressive-loop-optimizations)
 target_compile_options(game PRIVATE
-    -O0 -std=gnu89 -w -fno-pie ${GAME_SEMANTICS}
+    -std=gnu89 -w -fno-pie ${GAME_SEMANTICS}
     -fno-zero-initialized-in-bss -fno-toplevel-reorder -fdata-sections
     -include ${CMAKE_SOURCE_DIR}/src/host.h "-Wa,-I${HOST_ASM}")
 

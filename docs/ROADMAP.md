@@ -152,7 +152,8 @@ matching"):
      buffer padding, 4 bytes apart before).
    - **Speed (done):** the build was unoptimized: SDL3's CMake leaves an unset build type at Debug. It now defaults to
      RelWithDebInfo (-O2, with symbols), the game's C kept at -O0: at -O2 it plays otherwise, the demo parting from the
-     debug build's and stopping on a polyline of over 256 vertices, undefined behaviour somewhere in it still to find.
+     debug build's and stopping on a polyline of over 256 vertices, undefined behaviour somewhere in it (found in
+     milestone 14, and the game's C optimized since).
      Headless, the demo's 6,000 game frames went from 144 vertical blanks a second to 547, its game frames' hashes, SPU
      writes and the memory-card run's card the same to the byte as the debug build's, the native code agreeing with
      Unicorn.
@@ -342,6 +343,20 @@ matching"):
       A frame is shown at its display environment's corner: the drawing area's, 12 lines lower on the memory card's
       screens, shook the picture.
 14. **Alongside.** The CD's timing; the game's C at -O2 (its undefined behaviour found); Windows itself.
+    - **The game's C at -O2 (done):** each of the 33 files alone at -O2 against the -O0 build: three parted from it,
+      `800123F0.c` (the demo's hashes from game frame 7, then stuck), `800158E0.c` (a crash at start-up) and
+      `80029884.c` (from game frame 1,979). `-fno-aggressive-loop-optimizations` put each right, and the functions it
+      changes there loop over a structure's last array, declared with one element and indexed past it as the PlayStation's
+      code does: `Gfx_Init`'s over `g_FrameBuffers.e` (2 buffers, GCC 14 setting up 1), the paging's over
+      `D_80067950.e` and `D_800675B0.e`, `func_8002A554`'s and its neighbours' over `D_8006CB6C.p`. A variable of such a type bounds the loop
+      for GCC to the one element. With those four declarations made flexible (`[0]`) in a copy, all 33 files at plain
+      -O2 played the demo as the -O0 build; 13 such arrays are in the C, the declarations' fix asked of the
+      decompilation. GCC 2.7.2 made no such assumption, so `GAME_SEMANTICS` takes the flag, beside `-fwrapv` and the
+      others, and the game's C is built at the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game frames,
+      the memory-card run and a player's recorded run of 4,200 give the same `game_frames.txt`, SPU log and card as at
+      -O0, and the native code's 9,566 runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's and the
+      card's the same. Headless, the demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the game's C at
+      -O0.
 15. **Players' bugs, by their recorded runs.** A player records a run in the window (`CRASH2_GAME_CLOCK_RECORD`,
     CLAUDE.md) and it plays again headless frame for frame. Found so far: on Snow Go's bonus, dropped into from above,
     the camera stopped at its vertical path's end for good: `func_800225C0`'s equivalent C held the path's state in 4
