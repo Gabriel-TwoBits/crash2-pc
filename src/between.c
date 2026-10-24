@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "between.h"
+#include "game/gfx.h"
 #include "gool.h"
 #include "settings.h"
 
@@ -31,11 +32,6 @@
 /* The camera: its position and angles, six words from g_CameraX (decomp's config/symbol_addrs.txt) */
 #define CAMERA_WORDS 6
 #define CAMERA_ANGLES_FIRST 3
-/* A frame buffer's ordering table, display environment (its displayed rectangle's corner first) and drawing
- * environment (decomp's 800158E0.c) */
-#define FRAME_OT 0x18
-#define FRAME_DISP_ENV 0x2018
-#define FRAME_DRAW_ENV 0x202C
 #define FRAME_SHOWN_QUEUE 2
 
 typedef struct {
@@ -49,8 +45,8 @@ typedef struct {
 
 /* The game's (decomp's) */
 extern int32_t g_CameraX[CAMERA_WORDS];
-extern unsigned char *g_BuildBuffer[];
-extern unsigned char *g_DrawBuffer;
+extern GfxFrame *g_BuildBuffer[];
+extern GfxFrame *g_DrawBuffer;
 /* The game frames left before the game draws again, and the frame's flags, whose FLAGS_COUNTERS_STOPPED the memory
  * card's screens set (decomp's Gfx_EndFrame) */
 extern int32_t D_800675AC;
@@ -58,7 +54,7 @@ extern int32_t D_8006CB94;
 /* Whether the game is paused, its pause screen's opening and closing too (decomp's Sys_MainLoop) */
 extern int32_t g_Paused;
 #define FLAGS_COUNTERS_STOPPED 0x200000
-void Gfx_ResetFrame(void *frame);
+void Gfx_ResetFrame(GfxFrame *frame);
 int VSync(int mode);
 void *PutDrawEnv(void *env);
 int DrawOTag(uint32_t *table);
@@ -172,8 +168,8 @@ static void camera_halfway(void) {
 }
 
 void Host_FrameEnded(void) {
-    s_DrawnX = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV);
-    s_DrawnY = *(int16_t *)(g_DrawBuffer + FRAME_DISP_ENV + sizeof(int16_t));
+    s_DrawnX = g_DrawBuffer->disp.disp.x;
+    s_DrawnY = g_DrawBuffer->disp.disp.y;
     if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED) ||
         g_Paused != 0) {
         /* Off; or a game frame that drew nothing (the game leaves the buffers as they are while a level opens); or
@@ -203,17 +199,17 @@ static int restore(void *object, void *argument) {
 }
 
 void Host_FrameBetweenShown(void) {
-    unsigned char *frame = g_BuildBuffer[0];
+    GfxFrame *frame = g_BuildBuffer[0];
 
     VSync(0);
-    PutDrawEnv(frame + FRAME_DRAW_ENV);
-    DrawOTag((uint32_t *)(frame + FRAME_OT));
+    PutDrawEnv(&frame->draw);
+    DrawOTag(frame->ot);
     Gfx_ResetFrame(frame);
     Obj_ForEachList((void *)Obj_ForEachDescendant, (void *)restore, NULL);
     memcpy(g_CameraX, s_CameraNow, sizeof(s_CameraNow));
     /* The frame between, then the game frame it leads to */
-    s_ShownX[0] = *(int16_t *)(frame + FRAME_DISP_ENV);
-    s_ShownY[0] = *(int16_t *)(frame + FRAME_DISP_ENV + sizeof(int16_t));
+    s_ShownX[0] = frame->disp.disp.x;
+    s_ShownY[0] = frame->disp.disp.y;
     s_ShownX[1] = s_DrawnX;
     s_ShownY[1] = s_DrawnY;
     s_ShownCount = FRAME_SHOWN_QUEUE;

@@ -218,6 +218,9 @@ target_link_libraries(${PORT} PRIVATE SDL3::SDL3-shared m)
 set_source_files_properties(src/psyq/libgte.c PROPERTIES
     INCLUDE_DIRECTORIES "${HOST_ASM};${DECOMP}/include"
     COMPILE_OPTIONS "-std=gnu89;-w;${GAME_SEMANTICS};-DGTE_MODEL;-include;${CMAKE_SOURCE_DIR}/src/host.h")
+# The frame between reads the game's frame buffers by decomp's type (include/game/gfx.h); its include_asm.h takes the
+# host's macro.inc, as the game's C does
+set_source_files_properties(src/between.c PROPERTIES INCLUDE_DIRECTORIES "${HOST_ASM};${DECOMP}/include")
 set_target_properties(${PORT} PROPERTIES BUILD_RPATH "\$ORIGIN/_deps/sdl3-build" INSTALL_RPATH "\$ORIGIN")
 # At the PlayStation's RAM, 0x80000000 (src/host.h), and not position-independent: the game's data holds absolute
 # addresses. The BIOS's file calls go to src/psyq/card.c. On Windows the library is based there without ASLR, the

@@ -39,6 +39,10 @@ GAME_OPTIMIZATION = "-O2"
 HOST_DEFINES = ["-D_WASI_EMULATED_SIGNAL", "-D_WASI_EMULATED_PROCESS_CLOCKS"]
 # libgte's functions run the decompilation's GTE model, compiled with the game's C's semantics
 LIBGTE = "src/psyq/libgte.c"
+# The host's files that include the decompilation's headers (the native build's INCLUDE_DIRECTORIES, CMakeLists.txt),
+# whose include_asm.h's top-level assembly wasm has no place for, as the game's C's
+DECOMP_HEADERS = {"src/between.c"}
+DECOMP_HEADER_FLAGS = [f"-I{DECOMP / 'include'}", "-D__asm__(...)="]
 LIBGTE_FLAGS = ["-std=gnu89", "-w", "-fcommon", "-fno-strict-aliasing", "-fwrapv", "-fno-delete-null-pointer-checks",
                 "-DGTE_MODEL", "-D__asm__(...)="]
 # The functions the native program calls in the module
@@ -145,8 +149,9 @@ def main():
             commands.append([str(clang), *target, "-O0", *libgte, "-S", "-emit-llvm", str(path), "-o", str(ir)])
             host_ir.append(ir)
         else:
-            commands.append([str(clang), *target, "-O2", "-std=gnu11", *host_flags, "-c", str(path), "-o", str(obj)])
-            commands.append([str(clang), *target, "-O0", "-std=gnu11", *host_flags, "-S", "-emit-llvm", str(path), "-o",
+            flags = host_flags + (DECOMP_HEADER_FLAGS if source in DECOMP_HEADERS else [])
+            commands.append([str(clang), *target, "-O2", "-std=gnu11", *flags, "-c", str(path), "-o", str(obj)])
+            commands.append([str(clang), *target, "-O0", "-std=gnu11", *flags, "-S", "-emit-llvm", str(path), "-o",
                              str(ir)])
             host_ir.append(ir)
         host_objects.append(obj)
