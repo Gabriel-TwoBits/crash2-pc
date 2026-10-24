@@ -472,3 +472,10 @@ matching"):
       and the PS1 read what the register held, so the decompilation gives a host a value for each (`CALLER_LEFT_VALUE`,
       `LEFT_RETURN`, crash2-decomp 6771b96, empty on the PS1), which `src/host.h` takes: the check finds none left, and
       the runs are the same.
+    - **The frame buffers by decomp's type (2026-10-24):** `src/between.c` read the game's frame buffers at offsets of
+      its own (the ordering table at 0x18, the display environment at 0x2018, the drawing one at 0x202C); it now takes
+      decomp's `GfxFrame` (`include/game/gfx.h`), which includes libgpu's types without sdk.h's declarations, which
+      clashed with the C library's `bzero` (crash2-decomp 69b6d05). Its `include_asm.h` takes the host's `macro.inc`, as
+      libgte.c's, and the module's copy has no top-level assembly (`tools/wasm/module.py`'s `DECOMP_HEADERS`). At 60
+      frames a second, the pictures shown at every seventh blank from 3,000 to the demo's game frame 2,400 (frames
+      between among them), its frames and its sound are the same, on Linux and under Wine, 32-bit and 64-bit.
