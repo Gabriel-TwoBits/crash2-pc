@@ -15,13 +15,13 @@
 #include "settings.h"
 
 /* What the PlayStation's start-up (libsn's __SN_ENTRY_POINT) leaves the game: a heap from the image's end to the stack,
- * 8 bytes under the top of the 2 MB of RAM and 4 KB deep (the executable's words D_8005F188 and D_8005F184) */
+ * 8 bytes under the top of the 2 MB of RAM and 4 KB deep (the executable's words g_RamSize and g_StackSize) */
 #define PS1_RAM_BYTES 0x200000
 #define PS1_STACK_BYTES 0x1000
 #define PS1_STACK_TOP_GAP 8
 #define PS1_IMAGE_END 0x6F1F0
 #define HEAP_BYTES (PS1_RAM_BYTES - PS1_STACK_TOP_GAP - PS1_STACK_BYTES - PS1_IMAGE_END)
-/* The start-up passes the heap 4 bytes in; func_8001144C marks a word past its end */
+/* The start-up passes the heap 4 bytes in; Heap_Init marks a word past its end */
 #define HEAP_START_OFFSET 4
 #define HEAP_SLACK_BYTES 8
 #define SCRATCHPAD_BYTES 0x400
@@ -41,9 +41,9 @@
 #endif
 
 /* The heap's base and size, the start-up's words libsn's InitHeap reads */
-extern unsigned char *D_8005CB28;
-extern unsigned int D_8005CB2C;
-void func_8001144C(int *start, unsigned int bytes);
+extern unsigned char *g_HeapBase;
+extern unsigned int g_HeapSize;
+void Heap_Init(int *start, unsigned int bytes);
 int Game_Main(void);
 
 /* The linker's: the program's first address */
@@ -119,8 +119,8 @@ int main(int argc, char **argv) {
     Host_LoadSettings();
     Host_OpenDisc(Host_ChooseDisc(argc, argv));
     Host_SoundStart();
-    D_8005CB28 = heap_base();
-    D_8005CB2C = HEAP_BYTES;
-    func_8001144C((int *)(heap_base() + HEAP_START_OFFSET), HEAP_BYTES);
+    g_HeapBase = heap_base();
+    g_HeapSize = HEAP_BYTES;
+    Heap_Init((int *)(heap_base() + HEAP_START_OFFSET), HEAP_BYTES);
     return Game_Main();
 }

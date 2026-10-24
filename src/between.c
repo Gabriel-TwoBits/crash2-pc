@@ -58,7 +58,7 @@ extern int32_t D_8006CB94;
 /* Whether the game is paused, its pause screen's opening and closing too (decomp's Sys_MainLoop) */
 extern int32_t g_Paused;
 #define FLAGS_COUNTERS_STOPPED 0x200000
-void func_800163C4(int32_t *frame);
+void Gfx_ResetFrame(void *frame);
 int VSync(int mode);
 void *PutDrawEnv(void *env);
 int DrawOTag(uint32_t *table);
@@ -208,7 +208,7 @@ void Host_FrameBetweenShown(void) {
     VSync(0);
     PutDrawEnv(frame + FRAME_DRAW_ENV);
     DrawOTag((uint32_t *)(frame + FRAME_OT));
-    func_800163C4((int32_t *)frame);
+    Gfx_ResetFrame(frame);
     Obj_ForEachList((void *)Obj_ForEachDescendant, (void *)restore, NULL);
     memcpy(g_CameraX, s_CameraNow, sizeof(s_CameraNow));
     /* The frame between, then the game frame it leads to */
