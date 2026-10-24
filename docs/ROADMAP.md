@@ -468,5 +468,7 @@ matching"):
       `game_frames.txt`, SPU log, card and CD log as the 32-bit build, on Linux and the demo's and the card's under
       Wine; the demo takes 7.3 s instead of 9.4 (the 32-bit build's 8.0). Clang's own check of the game's C at -O2
       (`-Wsometimes-uninitialized`, `-Wreturn-type`) names five variables a path reads without a value and two functions
-      a path leaves without one, which change none of the runs above; their fix is asked of the decompilation, as clang
-      turns such a read into `poison` where GCC and the PS1 read what the register held.
+      a path leaves without one, which change none of the runs above. Clang turns such a read into `poison` where GCC
+      and the PS1 read what the register held, so the decompilation gives a host a value for each (`CALLER_LEFT_VALUE`,
+      `LEFT_RETURN`, crash2-decomp 6771b96, empty on the PS1), which `src/host.h` takes: the check finds none left, and
+      the runs are the same.
