@@ -48,7 +48,7 @@ matching"):
      retail ones: `.data` 0x3FE4 bytes from 0x8005B198, `.bss` 0xFF4C from 0x8005F2A4. The split's 86 words of jump
      tables into its own assembly hold 0.
    - **Memory:** the program, its data, the scratchpad and the heap sit at 0x80000000 (decision 2). `main.c` checks
-     them at start-up (0x80000000 to 0x801EC76C), then hands the heap to `func_8001144C` as libsn's start-up does: the
+     them at start-up (0x80000000 to 0x801EC76C), then hands the heap to `Heap_Init` as libsn's start-up does: the
      retail heap's 0x18FE08 bytes.
    - **Data layout:** the game's C reads across its variables' bounds, a word past one being its neighbour, so the
      link keeps the retail image's order and spacing. The split's data comes first, then each game file's small data
@@ -350,25 +350,25 @@ matching"):
       PlayStation's code does: `Gfx_Init`'s over `g_FrameBuffers.e` (2 buffers, GCC 14 setting up 1), the paging's over
       `D_80067950.e` and `D_800675B0.e`, `func_8002A554`'s and its neighbours' over `D_8006CB6C.p`. A variable of such a
       type bounds the loop for GCC to the one element. With those four declarations made flexible (`[0]`) in a copy, all
-      33 files at plain -O2 played the demo as the -O0 build; 13 such arrays are in the C, the declarations' fix asked
-      of the decompilation. GCC 2.7.2 made no such assumption, so `GAME_SEMANTICS` takes the flag, beside `-fwrapv` and
-      the others, and the game's C is built at the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game
-      frames, the memory-card run and a player's recorded run of 4,200 give the same `game_frames.txt`, SPU log and card
-      as at -O0, and the native code's 9,566 runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's
-      and the card's the same. Headless, the demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the
-      game's C at -O0.
+      33 files at plain -O2 played the demo as the -O0 build; 13 such arrays are in the C, all declared flexible since
+      in the decompilation (crash2-decomp 2b8c884), with which plain -O2 plays the demo as -O0 too. GCC 2.7.2 made no
+      such assumption, so `GAME_SEMANTICS` keeps the flag, beside `-fwrapv` and the others, and the game's C is built at
+      the build's type's level (RelWithDebInfo's -O2). The demo's 6,000 game frames, the memory-card run and a player's
+      recorded run of 4,200 give the same `game_frames.txt`, SPU log and card as at -O0, and the native code's 9,566
+      runs agree with Unicorn; the 32-bit Windows build under Wine, the demo's and the card's the same. Headless, the
+      demo takes 7.9 s instead of 10.5. The 64-bit build's module keeps the game's C at -O0.
     - **The CD's timing (done, on paced runs):** a schedule's `pace` line (run_game.lua's) now paces the port's game
       frames too: the game frame's first VSync(0) waits its count, and VSync(n) counts from its last return, as
-      libetc's.
-      With one, the drive takes its time as PCSX-Redux models it (`src/psyq/libcd.c`): a command's acknowledge (797
-      µs), ReadN's start (20 ms), a seek (3 µs a sector, then 1 ms), a sector each 6,666 µs at double speed, 650 ms to
-      change speed; the CPU's time, the blanks', passes while the game waits on the drive (`Host_Wait`), and a poll
+      libetc's. With one, the drive takes its time as PCSX-Redux models it (`src/psyq/libcd.c`): a command's acknowledge
+      (797 µs), ReadN's start (20 ms), a seek (3 µs a sector, then 1 ms), a sector each 6,666 µs at double speed, 650 ms
+      to change speed; the CPU's time, the blanks', passes while the game waits on the drive (`Host_Wait`), and a poll
       that finds it busy passes the 2,500 cycles the game's polling loop takes on the PS1 (some 90 a sector), so the
-      blanks come during a load as there. `tools/cd_log.lua` logs the game's libcd calls in run_game's emulator, the
-      CPU's cycles at each call and return, `CRASH2_CD_LOG` the port's in the same format. What the PS1's log showed of
-      libcd: after a read's last sector it sends Pause (35 ms), which keeps CdSync(1) at 0; a command waits for the last
-      one to complete (CdControl's Setloc after a read takes 35.9 ms); CdRead waits for Setmode's acknowledge only when
-      the mode changes. On the attract demo paced at 5 vsyncs from game frame 1, the first read's 678.7 ms (the spin to
+      blanks come during a load as there. decomp's `run_game.py --schedule demo-paced` is the demo so paced
+      (crash2-decomp 2f1d1bf). `tools/cd_log.lua` logs the game's libcd calls in run_game's emulator, the CPU's cycles
+      at each call and return, `CRASH2_CD_LOG` the port's in the same format. What the PS1's log showed of libcd: after
+      a read's last sector it sends Pause (35 ms), which keeps CdSync(1) at 0; a command waits for the last one to
+      complete (CdControl's Setloc after a read takes 35.9 ms); CdRead waits for Setmode's acknowledge only when the
+      mode changes. On the attract demo paced at 5 vsyncs from game frame 1, the first read's 678.7 ms (the spin to
       double speed among them) are 678.5 on the port, and the 812 calls of its first 600 game frames, their arguments
       and results, are the PS1's, but how many times a poll repeats.
     - **The sound's DMA's time:** with the drive timed, the game's RAM parted from the PS1's at game frame 10, in the
