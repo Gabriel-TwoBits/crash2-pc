@@ -490,90 +490,72 @@ void SsSeqCalledTbyT(void) {
     call0(SDK_SsSeqCalledTbyT);
 }
 
-/* SsSepStop */
-void func_80056304(int16_t access, int16_t seq) {
-    call2(SDK_func_80056304, SHORT(access), SHORT(seq));
+void SsSepStop(int16_t access, int16_t seq) {
+    call2(SDK_SsSepStop, SHORT(access), SHORT(seq));
 }
 
-/* SsSepSetVol */
-void func_80056760(int16_t access, int16_t seq, int16_t left, int16_t right) {
-    call4(SDK_func_80056760, SHORT(access), SHORT(seq), SHORT(left), SHORT(right));
+void SsSepSetVol(int16_t access, int16_t seq, int16_t left, int16_t right) {
+    call4(SDK_SsSepSetVol, SHORT(access), SHORT(seq), SHORT(left), SHORT(right));
 }
 
-/* SsSepSetCrescendo */
-void func_800528C4(int16_t access, int16_t seq, int32_t volume, int32_t ticks) {
-    call4(SDK_func_800528C4, SHORT(access), SHORT(seq), (uint32_t)volume, (uint32_t)ticks);
+void SsSepSetCrescendo(int16_t access, int16_t seq, int32_t volume, int32_t ticks) {
+    call4(SDK_SsSepSetCrescendo, SHORT(access), SHORT(seq), (uint32_t)volume, (uint32_t)ticks);
 }
 
-/* SsSepSetDecrescendo */
-void func_80052B4C(int16_t access, int16_t seq, int32_t volume, int32_t ticks) {
-    call4(SDK_func_80052B4C, SHORT(access), SHORT(seq), (uint32_t)volume, (uint32_t)ticks);
+void SsSepSetDecrescendo(int16_t access, int16_t seq, int32_t volume, int32_t ticks) {
+    call4(SDK_SsSepSetDecrescendo, SHORT(access), SHORT(seq), (uint32_t)volume, (uint32_t)ticks);
 }
 
-/* libspu: the 10 functions the game calls by addresses the split leaves unnamed are named by their arguments and uses
- * in decomp's src/game/800324A8.c and 800123F0.c */
-
-/* SpuSetKey */
-void func_80051078(int32_t on, uint32_t voices) {
-    call2(SDK_func_80051078, (uint32_t)on, voices);
+void SpuSetKey(int32_t on, uint32_t voices) {
+    call2(SDK_SpuSetKey, (uint32_t)on, voices);
 }
 
-/* SpuGetAllKeysStatus */
-void func_8005182C(char *status) {
-    call1(SDK_func_8005182C, POINTER(status));
+void SpuGetAllKeysStatus(char *status) {
+    call1(SDK_SpuGetAllKeysStatus, POINTER(status));
 }
 
-/* SpuSetVoiceAttr */
-void func_800518B8(const void *attributes) {
-    call1(SDK_func_800518B8, POINTER(attributes));
+void SpuSetVoiceAttr(const void *attributes) {
+    call1(SDK_SpuSetVoiceAttr, POINTER(attributes));
 }
 
-/* SpuGetVoiceAttr */
-void func_800521A8(void *attributes) {
-    call1(SDK_func_800521A8, POINTER(attributes));
+void SpuGetVoiceAttr(void *attributes) {
+    call1(SDK_SpuGetVoiceAttr, POINTER(attributes));
 }
 
-/* SpuSetCommonAttr */
-void func_800513D8(const void *attributes) {
-    call1(SDK_func_800513D8, POINTER(attributes));
+void SpuSetCommonAttr(const void *attributes) {
+    call1(SDK_SpuSetCommonAttr, POINTER(attributes));
 }
 
-/* SpuSetTransferMode */
-int32_t func_800512F8(int32_t mode) {
-    return (int32_t)call1(SDK_func_800512F8, (uint32_t)mode);
+int32_t SpuSetTransferMode(int32_t mode) {
+    return (int32_t)call1(SDK_SpuSetTransferMode, (uint32_t)mode);
 }
 
-/* SpuSetTransferStartAddr */
-uint32_t func_80051298(uint32_t address) {
-    return call1(SDK_func_80051298, address);
+uint32_t SpuSetTransferStartAddr(uint32_t address) {
+    return call1(SDK_SpuSetTransferStartAddr, address);
 }
 
-/* SpuWrite */
-uint32_t func_80051238(const void *data, uint32_t bytes) {
-    return call2(SDK_func_80051238, POINTER(data), bytes);
+uint32_t SpuWrite(const void *data, uint32_t bytes) {
+    return call2(SDK_SpuWrite, POINTER(data), bytes);
 }
 
-/* SpuIsTransferCompleted */
-int32_t func_80051328(int32_t mode) {
-    return (int32_t)call1(SDK_func_80051328, (uint32_t)mode);
+int32_t SpuIsTransferCompleted(int32_t mode) {
+    return (int32_t)call1(SDK_SpuIsTransferCompleted, (uint32_t)mode);
 }
 
 int32_t SpuInitMalloc(int32_t blocks, char *table) {
     return (int32_t)call2(SDK_SpuInitMalloc, (uint32_t)blocks, POINTER(table));
 }
 
-/* SpuSetReverbModeParam */
-void func_800501A8(const void *attributes) {
-    call1(SDK_func_800501A8, POINTER(attributes));
+void SpuSetReverbModeParam(const void *attributes) {
+    call1(SDK_SpuSetReverbModeParam, POINTER(attributes));
 }
 
 void SpuSetReverbDepth(const void *attributes) {
     call1(SDK_SpuSetReverbDepth, POINTER(attributes));
 }
 
-/* SpuSetReverb */
-int32_t func_8004FE38(int32_t on) {
-    return (int32_t)call1(SDK_func_8004FE38, (uint32_t)on);
+int32_t SpuSetReverb(int32_t on) {
+    return (int32_t)call1(SDK_SpuSetReverb, (uint32_t)on);
 }
 
 uint32_t SpuSetReverbVoice(int32_t on, uint32_t voices) {

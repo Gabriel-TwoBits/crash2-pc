@@ -71,7 +71,7 @@ matching"):
      every 0x1000 ticks of the CPU's clock / 8, the mode 0x258 that libapi's `SetRCnt` writes it. In the proportion of
      an NTSC frame's CPU cycles (263 lines of 3,413 video cycles at 53.693175 MHz, against 33.8688 MHz), that is
      17.28 calls of `Sys_TimerHandler` a frame.
-   - **SPU:** the paging waits on `func_80051328(0)` (SpuIsTransferCompleted) before and after a sound page's upload,
+   - **SPU:** the paging waits on `SpuIsTransferCompleted(0)` before and after a sound page's upload,
      which the retail libspu answers (milestone 7).
    - **Pad:** `src/psyq/pad.c` fills `InitPAD`'s buffers at each vertical blank, as the BIOS does: a digital pad with no
      button pressed in port 1, none in port 2. Left zeroed, they read as a pad with every button held, and the game
@@ -336,7 +336,7 @@ matching"):
     - **Checked:** with it on, the game's objects at Turtle Woods' frames are those of the 30 frames a second run, and
       the memory-card run saves the same card; the camera shown moves on in even steps, the frame between halfway;
       the pause menu's frames alike.
-    - **No frame between** where the game draws none (`D_800675AC`, while a level opens) or stops its counters (the
+    - **No frame between** where the game draws none (`g_DisplayHold`, while a level opens) or stops its counters (the
       memory card's screens, which it runs a vertical blank a frame already), nor while it is paused (`g_Paused`, its
       opening and closing too): the pause screen's picture shrinks into its corner from the frame shown before, and a
       frame between, its scene drawn anew, alternated with it each vertical blank, a stutter as it opened and closed.

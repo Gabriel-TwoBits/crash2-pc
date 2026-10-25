@@ -49,8 +49,8 @@ extern GfxFrame *g_BuildBuffer[];
 extern GfxFrame *g_DrawBuffer;
 /* The game frames left before the game draws again, and the frame's flags, whose FLAGS_COUNTERS_STOPPED the memory
  * card's screens set (decomp's Gfx_EndFrame) */
-extern int32_t D_800675AC;
-extern int32_t D_8006CB94;
+extern int32_t g_DisplayHold;
+extern int32_t g_FrameFlags;
 /* Whether the game is paused, its pause screen's opening and closing too (decomp's Sys_MainLoop) */
 extern int32_t g_Paused;
 #define FLAGS_COUNTERS_STOPPED 0x200000
@@ -170,7 +170,7 @@ static void camera_halfway(void) {
 void Host_FrameEnded(void) {
     s_DrawnX = g_DrawBuffer->disp.disp.x;
     s_DrawnY = g_DrawBuffer->disp.disp.y;
-    if (g_Settings[SETTING_FRAME_RATE].value == 0 || D_800675AC != 0 || (D_8006CB94 & FLAGS_COUNTERS_STOPPED) ||
+    if (g_Settings[SETTING_FRAME_RATE].value == 0 || g_DisplayHold != 0 || (g_FrameFlags & FLAGS_COUNTERS_STOPPED) ||
         g_Paused != 0) {
         /* Off; or a game frame that drew nothing (the game leaves the buffers as they are while a level opens); or
          * the memory card's screens, whose game frames the game runs a vertical blank each, at 60 already; or the
